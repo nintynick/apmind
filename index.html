@@ -1,0 +1,2858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autopoietic Mind</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0a0a0f; --surface: #12121a; --surface2: #1a1a25;
+  --border: #2a2a3a; --text: #e0e0e8; --dim: #888898;
+  --accent: #7b68ee; --accent2: #5b48ce;
+  --goal: #f0ad4e; --sub: #5bc0de; --try: #d9534f; --note: #888898;
+  --check: #5cb85c; --done: #5cb85c; --code: #7b68ee; --err: #d9534f;
+}
+body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace; font-size: 13px; }
+#root { max-width: 1200px; margin: 0 auto; padding: 16px; }
+.header { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.header h1 { font-size: 18px; color: var(--accent); font-weight: 600; white-space: nowrap; }
+.header-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.api-input { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 4px; font-family: inherit; font-size: 12px; width: 280px; }
+.api-input::placeholder { color: var(--dim); }
+.endpoint-input { width: 320px; }
+label { color: var(--dim); font-size: 11px; }
+.controls { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+.btn { background: var(--accent); color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 500; }
+.btn:hover { background: var(--accent2); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-secondary { background: var(--surface2); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); }
+.problem-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-bottom: 12px; }
+.problem-bar .label { color: var(--dim); font-size: 11px; margin-bottom: 4px; }
+.problem-bar .text { color: var(--text); font-size: 13px; }
+.budget-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.budget-item { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; }
+.budget-label { color: var(--dim); font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 4px; }
+.budget-track { background: var(--surface2); border-radius: 3px; height: 6px; overflow: hidden; }
+.budget-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.budget-fill.cells { background: var(--accent); }
+.budget-fill.steps { background: var(--sub); }
+.budget-fill.warn { background: var(--goal); }
+.budget-fill.danger { background: var(--err); }
+.main-grid { display: grid; grid-template-columns: 1fr 340px; gap: 12px; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.panel-header { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--dim); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+.panel-body { padding: 8px; max-height: 500px; overflow-y: auto; }
+.panel-body.collapsed { display: none; }
+.scratchpad-cell { padding: 6px 8px; border-radius: 4px; margin-bottom: 4px; background: var(--surface2); display: flex; gap: 8px; align-items: flex-start; }
+.cell-num { color: var(--dim); font-size: 11px; min-width: 20px; text-align: right; padding-top: 2px; }
+.cell-badge { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
+.badge-GOAL { background: rgba(240,173,78,0.15); color: var(--goal); }
+.badge-SUB { background: rgba(91,192,222,0.15); color: var(--sub); }
+.badge-TRY { background: rgba(217,83,79,0.15); color: var(--try); }
+.badge-NOTE { background: rgba(136,136,152,0.15); color: var(--note); }
+.badge-CHECK { background: rgba(92,184,92,0.15); color: var(--check); }
+.badge-DONE { background: rgba(92,184,92,0.15); color: var(--done); }
+.badge-CODE { background: rgba(123,104,238,0.15); color: var(--code); }
+.badge-ERR { background: rgba(217,83,79,0.15); color: var(--err); }
+.badge-NATIVE { background: rgba(240,173,78,0.15); color: var(--goal); }
+.badge-REFLECT { background: rgba(123,104,238,0.15); color: var(--accent); }
+.badge-NOVEL { background: rgba(255,215,0,0.25); color: #ffd700; }
+.cell-expr { color: var(--dim); font-size: 12px; flex: 1; white-space: pre-wrap; word-break: break-all; }
+.cell-result { color: var(--text); font-size: 12px; }
+.eval-source { font-size: 12px; color: var(--text); white-space: pre-wrap; line-height: 1.5; padding: 4px; }
+.history-item { padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.history-item:last-child { border-bottom: none; }
+.history-label { color: var(--accent); font-weight: 600; }
+.history-detail { color: var(--dim); margin-top: 2px; }
+.stats-bar { display: flex; gap: 16px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-top: 12px; font-size: 11px; color: var(--dim); flex-wrap: wrap; }
+.stat { display: flex; gap: 4px; }
+.stat-val { color: var(--text); font-weight: 600; }
+.status-msg { color: var(--dim); font-size: 12px; margin-left: 12px; }
+.scratchpad-scroll { max-height: 460px; overflow-y: auto; }
+.problem-badges { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.problem-badge { width: 32px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid var(--border);
+  background: var(--surface); color: var(--dim); transition: all 0.15s; }
+.problem-badge:hover { border-color: var(--accent); }
+.problem-badge.solved { background: rgba(92,184,92,0.15); color: var(--check); border-color: var(--check); }
+.problem-badge.failed { background: rgba(217,83,79,0.15); color: var(--err); border-color: var(--err); }
+.problem-badge.active { background: rgba(123,104,238,0.2); color: var(--accent); border-color: var(--accent); box-shadow: 0 0 6px rgba(123,104,238,0.3); }
+.problem-badge.future { opacity: 0.35; cursor: default; }
+.problem-badge.viewing { outline: 2px solid var(--goal); outline-offset: 1px; }
+.badge-round { font-size: 10px; color: var(--dim); margin-left: 4px; }
+.history-overlay { position: relative; }
+.history-overlay .history-label-tag { position: absolute; top: 4px; right: 8px; font-size: 10px; color: var(--goal);
+  background: rgba(240,173,78,0.15); padding: 2px 6px; border-radius: 3px; }
+.btn-continue { background: var(--check); margin-left: 8px; }
+.btn-continue:hover { background: #4a9f4a; }
+.cell-stepcost { color: var(--dim); font-size: 10px; white-space: nowrap; opacity: 0.6; padding-top: 2px; }
+.evolution-panel { margin-top: 12px; }
+.evolution-item { padding: 4px 8px; font-size: 11px; color: var(--dim); display: flex; justify-content: space-between; }
+.evolution-val { color: var(--text); font-weight: 600; }
+.evolution-list { color: var(--accent); font-size: 10px; padding: 2px 8px; word-break: break-all; }
+.budget-cap { color: var(--goal); font-size: 12px; font-weight: 600; margin-left: 8px; }
+.btn-export { background: var(--surface2); border: 1px solid var(--border); font-size: 10px; padding: 4px 8px; }
+.btn-import { background: var(--surface2); border: 1px solid var(--border); font-size: 10px; padding: 4px 8px; }
+.save-controls { display: flex; gap: 4px; margin-left: auto; }
+
+/* Tournament mode */
+.mode-toggle { display: flex; gap: 0; margin-bottom: 12px; }
+.mode-btn { padding: 6px 16px; border: 1px solid var(--border); background: var(--surface); color: var(--dim);
+  cursor: pointer; font-family: inherit; font-size: 12px; }
+.mode-btn:first-child { border-radius: 4px 0 0 4px; }
+.mode-btn:last-child { border-radius: 0 4px 4px 0; }
+.mode-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+.tournament-config { display: flex; gap: 12px; margin-bottom: 12px; align-items: center; }
+.config-field { display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--dim); }
+.config-input { width: 50px; background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); padding: 4px 8px; border-radius: 4px; font-family: inherit; font-size: 12px; text-align: center; }
+
+.lineages-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.lineage-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; transition: border-color 0.2s, box-shadow 0.2s; }
+.lineage-card.winner { border-color: #ffd700; box-shadow: 0 0 8px rgba(255,215,0,0.2); }
+.lineage-card.active { border-color: var(--accent); box-shadow: 0 0 8px rgba(123,104,238,0.3); }
+.lineage-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.lineage-id { color: var(--accent); font-weight: 600; font-size: 13px; }
+.lineage-fitness { color: #ffd700; font-weight: 700; font-size: 14px; }
+.lineage-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px; color: var(--dim); }
+.lineage-stat-val { color: var(--text); font-weight: 600; }
+.lineage-progress { height: 4px; background: var(--surface2); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.lineage-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+
+.gen-timeline { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding: 4px 0; }
+.gen-badge { min-width: 60px; padding: 6px 10px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; text-align: center; cursor: pointer; font-size: 11px; transition: all 0.15s; }
+.gen-badge:hover { border-color: var(--accent); }
+.gen-badge.active { border-color: var(--accent); background: rgba(123,104,238,0.1); }
+.gen-badge .gen-num { color: var(--text); font-weight: 600; display: block; }
+.gen-badge .gen-fitness { color: #ffd700; font-size: 10px; }
+
+.hall-of-fame { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+.hof-title { color: var(--dim); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.hof-entry { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.hof-entry:last-child { border-bottom: none; }
+.hof-gen { color: var(--accent); font-weight: 600; }
+.hof-fitness { color: #ffd700; }
+.hof-details { color: var(--dim); }
+
+.tournament-status { background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px 14px; margin-bottom: 12px; font-size: 12px; color: var(--text); }
+.tournament-status .label { color: var(--dim); font-size: 11px; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script>
+// ============================================================
+// LISP PARSER
+// ============================================================
+
+const SYM = 'symbol', PAIR = 'pair', CLOSURE = 'closure', NIL = null;
+
+function makeSym(name) { return {type: SYM, name}; }
+function makePair(car, cdr) { return {type: PAIR, car, cdr}; }
+function isSym(x) { return x && x.type === SYM; }
+function isPair(x) { return x && x.type === PAIR; }
+function isClosure(x) { return x && x.type === CLOSURE; }
+function isNil(x) { return x === null; }
+
+function arrayToList(arr) {
+  let r = NIL;
+  for (let i = arr.length - 1; i >= 0; i--) r = makePair(arr[i], r);
+  return r;
+}
+function listToArray(lst) {
+  const r = [];
+  while (isPair(lst)) { r.push(lst.car); lst = lst.cdr; }
+  return r;
+}
+
+function tokenize(src) {
+  const tokens = []; let i = 0;
+  while (i < src.length) {
+    if (/\s/.test(src[i])) { i++; continue; }
+    if (src[i] === ';') { while (i < src.length && src[i] !== '\n') i++; continue; }
+    if (src[i] === '(' || src[i] === ')') { tokens.push(src[i++]); continue; }
+    if (src[i] === "'") { tokens.push("'"); i++; continue; }
+    if (src[i] === '"') {
+      let s = ''; i++;
+      while (i < src.length && src[i] !== '"') {
+        if (src[i] === '\\') { i++; s += src[i] || ''; } else s += src[i];
+        i++;
+      }
+      i++; tokens.push({type: 'string', value: s}); continue;
+    }
+    let tok = '';
+    while (i < src.length && !/[\s();]/.test(src[i])) tok += src[i++];
+    tokens.push(tok);
+  }
+  return tokens;
+}
+
+function parseAtom(tok) {
+  if (typeof tok === 'object' && tok.type === 'string') return tok.value;
+  if (tok === '#t') return true;
+  if (tok === '#f') return false;
+  const n = Number(tok);
+  if (!isNaN(n) && tok !== '') return n;
+  return makeSym(tok);
+}
+
+function parse(tokens) {
+  let pos = 0;
+  function read() {
+    if (pos >= tokens.length) throw new Error('unexpected end of input');
+    const tok = tokens[pos++];
+    if (tok === '(') {
+      const list = [];
+      while (pos < tokens.length && tokens[pos] !== ')') list.push(read());
+      if (pos >= tokens.length) throw new Error('missing )');
+      pos++;
+      return arrayToList(list);
+    }
+    if (tok === ')') throw new Error('unexpected )');
+    if (tok === "'") return arrayToList([makeSym('quote'), read()]);
+    return parseAtom(tok);
+  }
+  const exprs = [];
+  while (pos < tokens.length) exprs.push(read());
+  return exprs;
+}
+
+function parseOne(src) { return parse(tokenize(src))[0]; }
+function parseAll(src) { return parse(tokenize(src)); }
+
+function lispToString(val) {
+  if (val === null) return '()';
+  if (val === true) return '#t';
+  if (val === false) return '#f';
+  if (typeof val === 'number') return String(val);
+  if (typeof val === 'string') return JSON.stringify(val);
+  if (isSym(val)) return val.name;
+  if (isClosure(val)) return '<lambda>';
+  if (isPair(val)) {
+    const parts = [];
+    let cur = val;
+    while (isPair(cur)) { parts.push(lispToString(cur.car)); cur = cur.cdr; }
+    if (cur !== null) parts.push('.', lispToString(cur));
+    return '(' + parts.join(' ') + ')';
+  }
+  return String(val);
+}
+
+// ============================================================
+// ENVIRONMENT SYSTEM
+// ============================================================
+
+function makeEnv(parent) { return {bindings: new Map(), parent}; }
+function envLookup(env, name) {
+  let e = env;
+  while (e) { if (e.bindings.has(name)) return e.bindings.get(name); e = e.parent; }
+  throw new Error('unbound variable: ' + name);
+}
+function envDefine(env, name, val) { env.bindings.set(name, val); return val; }
+function envSet(env, name, val) {
+  let e = env;
+  while (e) { if (e.bindings.has(name)) { e.bindings.set(name, val); return val; } e = e.parent; }
+  throw new Error('unbound variable: ' + name);
+}
+
+// ============================================================
+// GROUND EVAL (JavaScript) — Fixed, never changes
+// ============================================================
+
+function evaluate(expr, env, ctx) {
+  ctx.steps++;
+  if (ctx.steps > ctx.stepLimit) throw new Error('step limit exceeded');
+
+  // Self-evaluating
+  if (typeof expr === 'number') return expr;
+  if (typeof expr === 'boolean') return expr;
+  if (typeof expr === 'string') return expr;
+  if (expr === null) return null;
+
+  // Symbol lookup
+  if (isSym(expr)) return envLookup(env, expr.name);
+
+  if (!isPair(expr)) throw new Error('unknown form: ' + lispToString(expr));
+
+  const head = expr.car;
+  const headName = isSym(head) ? head.name : null;
+
+  // Special forms
+  if (headName === 'quote') return expr.cdr.car;
+
+  if (headName === 'if') {
+    const test = evaluate(expr.cdr.car, env, ctx);
+    if (test !== false && test !== null)
+      return evaluate(expr.cdr.cdr.car, env, ctx);
+    else if (expr.cdr.cdr.cdr && isPair(expr.cdr.cdr.cdr))
+      return evaluate(expr.cdr.cdr.cdr.car, env, ctx);
+    else return null;
+  }
+
+  if (headName === 'define') {
+    const target = expr.cdr.car;
+    if (isPair(target)) {
+      // (define (name params...) body...) shorthand
+      const name = target.car.name;
+      const params = listToArray(target.cdr).map(p => p.name);
+      const body = listToArray(expr.cdr.cdr);
+      const closure = {type: CLOSURE, params, body, env};
+      envDefine(env, name, closure);
+      return closure;
+    }
+    const val = evaluate(expr.cdr.cdr.car, env, ctx);
+    envDefine(env, target.name, val);
+    return val;
+  }
+
+  if (headName === 'set!') {
+    const sym = expr.cdr.car;
+    const val = evaluate(expr.cdr.cdr.car, env, ctx);
+    envSet(env, sym.name, val);
+    return val;
+  }
+
+  if (headName === 'lambda') {
+    const params = listToArray(expr.cdr.car).map(p => p.name);
+    const body = listToArray(expr.cdr.cdr);
+    return {type: CLOSURE, params, body, env};
+  }
+
+  if (headName === 'let') {
+    const bindings = listToArray(expr.cdr.car);
+    const body = listToArray(expr.cdr.cdr);
+    const child = makeEnv(env);
+    for (const b of bindings) {
+      const name = b.car.name;
+      const val = evaluate(b.cdr.car, env, ctx);
+      envDefine(child, name, val);
+    }
+    let result = null;
+    for (const e of body) result = evaluate(e, child, ctx);
+    return result;
+  }
+
+  if (headName === 'begin') {
+    let result = null;
+    let cur = expr.cdr;
+    while (isPair(cur)) { result = evaluate(cur.car, env, ctx); cur = cur.cdr; }
+    return result;
+  }
+
+  if (headName === 'cond') {
+    let clauses = expr.cdr;
+    while (isPair(clauses)) {
+      const clause = clauses.car;
+      const test = clause.car;
+      if (isSym(test) && test.name === 'else') {
+        let r = null;
+        let body = clause.cdr;
+        while (isPair(body)) { r = evaluate(body.car, env, ctx); body = body.cdr; }
+        return r;
+      }
+      const tv = evaluate(test, env, ctx);
+      if (tv !== false && tv !== null) {
+        let r = null;
+        let body = clause.cdr;
+        while (isPair(body)) { r = evaluate(body.car, env, ctx); body = body.cdr; }
+        return r;
+      }
+      clauses = clauses.cdr;
+    }
+    return null;
+  }
+
+  if (headName === 'and') {
+    let result = true;
+    let cur = expr.cdr;
+    while (isPair(cur)) {
+      result = evaluate(cur.car, env, ctx);
+      if (result === false || result === null) return false;
+      cur = cur.cdr;
+    }
+    return result;
+  }
+
+  if (headName === 'or') {
+    let cur = expr.cdr;
+    while (isPair(cur)) {
+      const v = evaluate(cur.car, env, ctx);
+      if (v !== false && v !== null) return v;
+      cur = cur.cdr;
+    }
+    return false;
+  }
+
+  // ── Metacognitive forms (handled by ground eval) ──
+  if (headName === 'goal') {
+    const text = evaluate(expr.cdr.car, env, ctx);
+    return text;
+  }
+
+  if (headName === 'sub') {
+    const label = evaluate(expr.cdr.car, env, ctx);
+    const body = expr.cdr.cdr.car;
+    const result = evaluateViaMyEval(body, env, ctx);
+    return result;
+  }
+
+  if (headName === 'try') {
+    try {
+      const result = evaluateViaMyEval(expr.cdr.car, env, ctx);
+      return arrayToList([true, result]);
+    } catch (e) {
+      return arrayToList([false, e.message || String(e)]);
+    }
+  }
+
+  if (headName === 'note') {
+    const text = evaluate(expr.cdr.car, env, ctx);
+    return text;
+  }
+
+  if (headName === 'check') {
+    let expected;
+    try {
+      expected = evaluate(expr.cdr.car, env, ctx);
+    } catch (e) {
+      throw new Error('check: error evaluating expected value (did you forget to quote it?): ' + (e.message || String(e)));
+    }
+    const actual = evaluateViaMyEval(expr.cdr.cdr.car, env, ctx);
+    return lispEqual(expected, actual);
+  }
+
+  if (headName === 'done') {
+    const result = evaluateViaMyEval(expr.cdr.car, env, ctx);
+    if (isClosure(result) || typeof result === 'function') {
+      throw new Error('done received a function, not a value. Use (done (f args...)) not (done f)');
+    }
+    ctx.done = true;
+    ctx.doneValue = result;
+    return result;
+  }
+
+  if (headName === 'show-eval') {
+    return ctx.myEvalSource ? parseOne(ctx.myEvalSource) : makeSym('no-eval-source');
+  }
+
+  if (headName === 'edit-eval!') {
+    // Evaluate the argument (unwraps quote, etc.) to get the raw define expression
+    const newEvalExpr = evaluate(expr.cdr.car, env, ctx);
+    return editEval(newEvalExpr, env, ctx);
+  }
+
+  if (headName === 'extend-eval!') {
+    // (extend-eval! 'form-name '(handler-body))
+    // Adds a new dispatch clause ((eq? head 'form-name) handler-body) to my-eval
+    const formNameExpr = evaluate(expr.cdr.car, env, ctx);
+    if (!isSym(formNameExpr)) throw new Error('extend-eval!: first arg must be a symbol (form name)');
+    const bodyExpr = evaluate(expr.cdr.cdr.car, env, ctx);
+    return extendEval(formNameExpr.name, bodyExpr, env, ctx);
+  }
+
+  if (headName === 'show-env') {
+    const result = [];
+    let e = env;
+    while (e) {
+      for (const [k, v] of e.bindings) {
+        if (typeof v === 'function') continue;
+        result.push(arrayToList([makeSym(k), isClosure(v) ? makeSym('<lambda>') : v]));
+      }
+      e = e.parent;
+    }
+    return arrayToList(result);
+  }
+
+  if (headName === 'eval-in') {
+    const bodyExpr = expr.cdr.car;
+    const envAlist = evaluate(expr.cdr.cdr.car, env, ctx);
+    const sandbox = makeEnv(ctx.baseEnv);
+    let cur = envAlist;
+    while (isPair(cur)) {
+      const pair = cur.car;
+      envDefine(sandbox, pair.car.name, pair.cdr.car);
+      cur = cur.cdr;
+    }
+    return evaluate(bodyExpr, sandbox, ctx);
+  }
+
+  if (headName === 'with-limit') {
+    const limit = evaluate(expr.cdr.car, env, ctx);
+    const body = expr.cdr.cdr.car;
+    const savedLimit = ctx.stepLimit;
+    const subLimit = ctx.steps + limit;
+    ctx.stepLimit = Math.min(savedLimit, subLimit);
+    try {
+      const result = evaluate(body, env, ctx);
+      ctx.stepLimit = savedLimit;
+      return arrayToList([true, result]);
+    } catch (e) {
+      ctx.stepLimit = savedLimit;
+      return arrayToList([false, e.message || String(e)]);
+    }
+  }
+
+  if (headName === 'defnative!') {
+    // (defnative! name (params...) body...)
+    const name = expr.cdr.car;
+    if (!isSym(name)) throw new Error('defnative! expects symbol name');
+    // Cap enforcement
+    const cap = nativeCapForRound(ctx.currentRound || 1);
+    if ((ctx.nativeDefsThisRound || 0) >= cap) {
+      return arrayToList([false, 'native slot limit reached. Use edit-eval! to add forms to my-eval instead.']);
+    }
+    ctx.nativeDefsThisRound = (ctx.nativeDefsThisRound || 0) + 1;
+    const paramList = listToArray(expr.cdr.cdr.car).map(p => p.name);
+    const bodyExprs = listToArray(expr.cdr.cdr.cdr);
+    // Create a native-speed closure that evaluates body through ground eval
+    const capturedEnv = env;
+    const nativeFn = (args, fnCtx) => {
+      const child = makeEnv(capturedEnv);
+      for (let i = 0; i < paramList.length; i++) {
+        envDefine(child, paramList[i], i < args.length ? args[i] : null);
+      }
+      let result = null;
+      for (const e of bodyExprs) result = evaluate(e, child, fnCtx || ctx);
+      return result;
+    };
+    nativeFn._isNative = true;
+    nativeFn._nativeName = name.name;
+    nativeFn._sourceParams = paramList;
+    nativeFn._sourceBody = bodyExprs;
+    envDefine(env, name.name, nativeFn);
+    // Track in stats if available
+    if (ctx.onNativeDef) ctx.onNativeDef(name.name);
+    return arrayToList([true, name]);
+  }
+
+  if (headName === 'show-helpers') {
+    if (ctx.persistentDefs) {
+      const entries = Object.entries(ctx.persistentDefs).map(([n, def]) =>
+        arrayToList([makeSym(n), def.isNative ? makeSym('native') : makeSym('lisp')])
+      );
+      return arrayToList(entries);
+    }
+    return null;
+  }
+
+  // ── Function application ──
+  const proc = evaluate(head, env, ctx);
+  const args = [];
+  let argList = expr.cdr;
+  while (isPair(argList)) {
+    args.push(evaluate(argList.car, env, ctx));
+    argList = argList.cdr;
+  }
+
+  return applyProc(proc, args, ctx);
+}
+
+function applyProc(proc, args, ctx) {
+  if (typeof proc === 'function') return proc(args, ctx);
+  if (isClosure(proc)) {
+    const child = makeEnv(proc.env);
+    for (let i = 0; i < proc.params.length; i++) {
+      envDefine(child, proc.params[i], i < args.length ? args[i] : null);
+    }
+    let result = null;
+    for (const e of proc.body) result = evaluate(e, child, ctx);
+    return result;
+  }
+  throw new Error('not a procedure: ' + lispToString(proc));
+}
+
+function lispEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a === 'number' && typeof b === 'number') return a === b;
+  if (typeof a === 'string' && typeof b === 'string') return a === b;
+  if (typeof a === 'boolean' && typeof b === 'boolean') return a === b;
+  if (isNil(a) && isNil(b)) return true;
+  if (isSym(a) && isSym(b)) return a.name === b.name;
+  if (isPair(a) && isPair(b)) return lispEqual(a.car, b.car) && lispEqual(a.cdr, b.cdr);
+  return false;
+}
+
+// ============================================================
+// PRIMITIVES
+// ============================================================
+
+function installPrimitives(env) {
+  const def = (name, fn) => envDefine(env, name, fn);
+  def('+', (a) => a.reduce((s, x) => s + x, 0));
+  def('-', (a) => a.length === 1 ? -a[0] : a[0] - a[1]);
+  def('*', (a) => a.reduce((s, x) => s * x, 1));
+  def('/', (a) => a[0] / a[1]);
+  def('modulo', (a) => a[0] % a[1]);
+  def('<', (a) => a[0] < a[1]);
+  def('>', (a) => a[0] > a[1]);
+  def('<=', (a) => a[0] <= a[1]);
+  def('>=', (a) => a[0] >= a[1]);
+  def('=', (a) => lispEqual(a[0], a[1]));
+  def('eq?', (a) => lispEqual(a[0], a[1]));
+  def('not', (a) => a[0] === false || a[0] === null);
+  def('cons', (a) => makePair(a[0], a[1]));
+  def('car', (a) => { if (!isPair(a[0])) throw new Error('car of non-pair: ' + lispToString(a[0])); return a[0].car; });
+  def('cdr', (a) => { if (!isPair(a[0])) throw new Error('cdr of non-pair: ' + lispToString(a[0])); return a[0].cdr; });
+  def('cadr', (a) => a[0].cdr.car);
+  def('caddr', (a) => a[0].cdr.cdr.car);
+  def('cadddr', (a) => a[0].cdr.cdr.cdr.car);
+  def('cddr', (a) => a[0].cdr.cdr);
+  def('list', (a) => arrayToList(a));
+  def('length', (a) => { let n = 0, c = a[0]; while (isPair(c)) { n++; c = c.cdr; } return n; });
+  def('append', (a) => {
+    if (a.length === 0) return null;
+    if (a.length === 1) return a[0];
+    const items = [];
+    for (let i = 0; i < a.length - 1; i++) { let c = a[i]; while (isPair(c)) { items.push(c.car); c = c.cdr; } }
+    let result = a[a.length - 1];
+    for (let i = items.length - 1; i >= 0; i--) result = makePair(items[i], result);
+    return result;
+  });
+  def('map', (a, ctx) => {
+    const fn = a[0], lst = a[1], result = [];
+    let c = lst;
+    while (isPair(c)) { result.push(applyProc(fn, [c.car], ctx)); c = c.cdr; }
+    return arrayToList(result);
+  });
+  def('filter', (a, ctx) => {
+    const fn = a[0], lst = a[1], result = [];
+    let c = lst;
+    while (isPair(c)) { if (applyProc(fn, [c.car], ctx)) result.push(c.car); c = c.cdr; }
+    return arrayToList(result);
+  });
+  def('null?', (a) => isNil(a[0]));
+  def('pair?', (a) => isPair(a[0]));
+  def('number?', (a) => typeof a[0] === 'number');
+  def('boolean?', (a) => typeof a[0] === 'boolean');
+  def('string?', (a) => typeof a[0] === 'string');
+  def('symbol?', (a) => isSym(a[0]));
+  def('display', (a) => { console.log('[lisp]', lispToString(a[0])); return a[0]; });
+  def('error', (a) => { throw new Error(typeof a[0] === 'string' ? a[0] : lispToString(a[0])); });
+  def('equal?', (a) => lispEqual(a[0], a[1]));
+  def('abs', (a) => Math.abs(a[0]));
+  def('min', (a) => Math.min(a[0], a[1]));
+  def('max', (a) => Math.max(a[0], a[1]));
+  def('apply', (a, ctx) => {
+    const fn = a[0];
+    const argList = a[a.length - 1];
+    const argArr = listToArray(argList);
+    return applyProc(fn, argArr, ctx);
+  });
+  def('newline', () => { console.log(); return null; });
+  def('caar', (a) => a[0].car.car);
+  def('cdar', (a) => a[0].car.cdr);
+  def('memq', (a) => {
+    let c = a[1];
+    while (isPair(c)) {
+      if (isSym(a[0]) && isSym(c.car) && a[0].name === c.car.name) return c;
+      if (a[0] === c.car) return c;
+      c = c.cdr;
+    }
+    return false;
+  });
+  def('member', (a) => {
+    let c = a[1];
+    while (isPair(c)) { if (lispEqual(a[0], c.car)) return c; c = c.cdr; }
+    return false;
+  });
+  def('assoc', (a) => {
+    let c = a[1];
+    while (isPair(c)) {
+      if (isPair(c.car) && lispEqual(a[0], c.car.car)) return c.car;
+      c = c.cdr;
+    }
+    return false;
+  });
+}
+
+// ============================================================
+// METACIRCULAR SEED — my-eval as Lisp source
+// ============================================================
+
+const MY_EVAL_SEED = `
+(define (my-eval expr env)
+  (cond
+    ((number? expr) expr)
+    ((boolean? expr) expr)
+    ((string? expr) expr)
+    ((symbol? expr) (env-lookup expr env))
+    ((not (pair? expr)) (error "unknown form"))
+    (else
+      (let ((head (car expr)))
+        (cond
+          ((eq? head 'quote)  (cadr expr))
+          ((eq? head 'if)     (if (my-eval (cadr expr) env)
+                                  (my-eval (caddr expr) env)
+                                  (if (null? (cdddr expr)) ()
+                                      (my-eval (cadddr expr) env))))
+          ((eq? head 'lambda) (make-closure (cadr expr) (cddr expr) env))
+          ((eq? head 'define)
+            (if (pair? (cadr expr))
+                (let ((name (car (cadr expr)))
+                      (params (cdr (cadr expr)))
+                      (body (cddr expr)))
+                  (let ((val (make-closure params body env)))
+                    (env-define! env name val) val))
+                (let ((val (my-eval (caddr expr) env)))
+                  (env-define! env (cadr expr) val) val)))
+          ((eq? head 'set!)   (let ((val (my-eval (caddr expr) env)))
+                                (env-set! env (cadr expr) val) val))
+          ((eq? head 'let)
+            (if (symbol? (cadr expr))
+                (my-eval-named-let (cadr expr) (caddr expr) (cdddr expr) env)
+                (my-eval-let (cadr expr) (cddr expr) env)))
+          ((eq? head 'let*)   (my-eval-let* (cadr expr) (cddr expr) env))
+          ((eq? head 'letrec) (my-eval-letrec (cadr expr) (cddr expr) env))
+          ((eq? head 'begin)  (my-eval-seq (cdr expr) env))
+          ((eq? head 'cond)   (my-eval-cond (cdr expr) env))
+          ((eq? head 'and)    (my-eval-and (cdr expr) env))
+          ((eq? head 'or)     (my-eval-or (cdr expr) env))
+          ((eq? head 'when)   (if (my-eval (cadr expr) env)
+                                  (my-eval-seq (cddr expr) env) ()))
+          ((eq? head 'unless) (if (my-eval (cadr expr) env)
+                                  () (my-eval-seq (cddr expr) env)))
+          ((eq? head 'for-each)
+            (let ((fn (my-eval (cadr expr) env))
+                  (lst (my-eval (caddr expr) env)))
+              (my-eval-for-each fn lst)))
+          (else
+            (my-apply (my-eval head env)
+                      (map (lambda (a) (my-eval a env))
+                           (cdr expr)))))))))
+`;
+
+const MY_EVAL_HELPERS = `
+(define (env-lookup sym env)
+  (env-lookup-prim sym env))
+
+(define (env-define! env sym val)
+  (env-define-prim env sym val))
+
+(define (env-set! env sym val)
+  (env-set-prim env sym val))
+
+(define (make-closure params body env)
+  (make-closure-prim params body env))
+
+(define (my-apply proc args)
+  (apply-prim proc args))
+
+(define (my-eval-let bindings body env)
+  (let ((child (make-child-env env)))
+    (my-eval-let-binds bindings child env)
+    (my-eval-seq body child)))
+
+(define (my-eval-let-binds bindings child parent)
+  (if (null? bindings) ()
+      (begin
+        (env-define! child (car (car bindings))
+                     (my-eval (cadr (car bindings)) parent))
+        (my-eval-let-binds (cdr bindings) child parent))))
+
+(define (my-eval-seq exprs env)
+  (if (null? (cdr exprs))
+      (my-eval (car exprs) env)
+      (begin (my-eval (car exprs) env)
+             (my-eval-seq (cdr exprs) env))))
+
+(define (cdddr x) (cdr (cdr (cdr x))))
+
+(define (my-eval-let* bindings body env)
+  (if (null? bindings)
+      (my-eval-seq body env)
+      (let ((child (make-child-env env)))
+        (env-define! child (car (car bindings))
+                     (my-eval (cadr (car bindings)) env))
+        (my-eval-let* (cdr bindings) body child))))
+
+(define (my-eval-letrec bindings body env)
+  (let ((child (make-child-env env)))
+    (my-eval-letrec-init bindings child)
+    (my-eval-letrec-set bindings child)
+    (my-eval-seq body child)))
+
+(define (my-eval-letrec-init bindings env)
+  (if (null? bindings) ()
+      (begin
+        (env-define! env (car (car bindings)) ())
+        (my-eval-letrec-init (cdr bindings) env))))
+
+(define (my-eval-letrec-set bindings env)
+  (if (null? bindings) ()
+      (begin
+        (env-set! env (car (car bindings))
+                  (my-eval (cadr (car bindings)) env))
+        (my-eval-letrec-set (cdr bindings) env))))
+
+(define (my-eval-named-let name bindings body env)
+  (let ((params (map car bindings))
+        (args (map (lambda (b) (my-eval (cadr b) env)) bindings)))
+    (let ((child (make-child-env env)))
+      (let ((closure (make-closure params body child)))
+        (env-define! child name closure)
+        (my-apply closure args)))))
+
+(define (my-eval-cond clauses env)
+  (if (null? clauses) ()
+      (let ((clause (car clauses)))
+        (if (eq? (car clause) 'else)
+            (my-eval-seq (cdr clause) env)
+            (if (my-eval (car clause) env)
+                (my-eval-seq (cdr clause) env)
+                (my-eval-cond (cdr clauses) env))))))
+
+(define (my-eval-and exprs env)
+  (if (null? exprs) #t
+      (let ((val (my-eval (car exprs) env)))
+        (if (not val) #f
+            (if (null? (cdr exprs)) val
+                (my-eval-and (cdr exprs) env))))))
+
+(define (my-eval-or exprs env)
+  (if (null? exprs) #f
+      (let ((val (my-eval (car exprs) env)))
+        (if val val
+            (my-eval-or (cdr exprs) env)))))
+
+(define (my-eval-for-each fn lst)
+  (if (null? lst) ()
+      (begin (my-apply fn (list (car lst)))
+             (my-eval-for-each fn (cdr lst)))))
+`;
+
+// ============================================================
+// INSTALL MY-EVAL HELPERS AS PRIMITIVES
+// ============================================================
+
+function installMetaPrimitives(env) {
+  envDefine(env, 'env-lookup-prim', (args) => {
+    const sym = args[0], e = args[1];
+    if (!isSym(sym)) throw new Error('env-lookup expects symbol, got: ' + lispToString(sym));
+    return envLookup(e, sym.name);
+  });
+  envDefine(env, 'env-define-prim', (args) => {
+    const e = args[0], sym = args[1], val = args[2];
+    if (!isSym(sym)) throw new Error('env-define! expects symbol, got: ' + lispToString(sym));
+    envDefine(e, sym.name, val);
+    return val;
+  });
+  envDefine(env, 'make-closure-prim', (args) => {
+    const params = listToArray(args[0]).map(p => p.name);
+    const body = listToArray(args[1]);
+    const closureEnv = args[2];
+    return {type: CLOSURE, params, body, env: closureEnv};
+  });
+  envDefine(env, 'apply-prim', (args, ctx) => {
+    const proc = args[0];
+    const argArr = listToArray(args[1]);
+    return applyProc(proc, argArr, ctx);
+  });
+  envDefine(env, 'make-child-env', (args) => {
+    return makeEnv(args[0]);
+  });
+  envDefine(env, 'env-set-prim', (args) => {
+    const e = args[0], sym = args[1], val = args[2];
+    if (!isSym(sym)) throw new Error('env-set! expects symbol, got: ' + lispToString(sym));
+    envSet(e, sym.name, val);
+    return val;
+  });
+}
+
+// ============================================================
+// EDIT-EVAL! with safety checks
+// ============================================================
+
+function editEval(newEvalExpr, env, ctx) {
+  const newSource = lispToString(newEvalExpr);
+  const backup = ctx.myEvalSource;
+
+  try {
+    // Parse and evaluate the new eval definition
+    const exprs = parseAll(newSource);
+    for (const e of exprs) evaluate(e, env, {...ctx, steps: 0, stepLimit: 2000});
+
+    // Run sanity tests
+    const testEnv = makeEnv(ctx.baseEnv);
+    installPrimitives(testEnv);
+    installMetaPrimitives(testEnv);
+    // Re-install helpers so my-eval can use them
+    const helpers = parseAll(MY_EVAL_HELPERS);
+    const helperCtx = {steps: 0, stepLimit: 2000, baseEnv: testEnv, myEvalSource: newSource};
+    for (const h of helpers) evaluate(h, testEnv, helperCtx);
+    // Install the new eval
+    const newExprs = parseAll(newSource);
+    for (const e of newExprs) evaluate(e, testEnv, helperCtx);
+
+    const myEvalFn = envLookup(testEnv, 'my-eval');
+
+    const tests = [
+      {expr: '42', env: 'empty', expected: 42},
+      {expr: '(+ 1 2)', env: 'base', expected: 3},
+      {expr: '(if #t 1 2)', env: 'base', expected: 1},
+      {expr: '((lambda (x) x) 5)', env: 'base', expected: 5},
+    ];
+
+    for (const t of tests) {
+      const testExprParsed = parseOne(t.expr);
+      const tEnv = t.env === 'empty' ? makeEnv(null) : testEnv;
+      const tCtx = {steps: 0, stepLimit: 500, baseEnv: testEnv, myEvalSource: newSource};
+      const result = applyProc(myEvalFn, [testExprParsed, tEnv], tCtx);
+      if (!lispEqual(result, t.expected)) {
+        throw new Error(`sanity test failed: ${t.expr} => ${lispToString(result)}, expected ${t.expected}`);
+      }
+    }
+
+    // All passed — commit the change
+    ctx.myEvalSource = newSource;
+    // Install in the actual environment
+    const realExprs = parseAll(newSource);
+    for (const e of realExprs) evaluate(e, env, {steps: 0, stepLimit: 2000, baseEnv: ctx.baseEnv, myEvalSource: newSource});
+
+    return arrayToList([true, makeSym('eval-updated')]);
+  } catch (e) {
+    ctx.myEvalSource = backup;
+    return arrayToList([false, 'eval edit rejected: ' + (e.message || String(e))]);
+  }
+}
+
+// ============================================================
+// EXTEND-EVAL! — adds a single dispatch clause to my-eval
+// ============================================================
+
+function extendEval(formName, bodyExpr, env, ctx) {
+  const bodyStr = lispToString(bodyExpr);
+  const currentSource = ctx.myEvalSource;
+
+  // Check if form already exists in current source
+  const formPattern = new RegExp(`\\(eq\\?\\s+head\\s+['\(quote ]*${formName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[)]*\\)`);
+  if (formPattern.test(currentSource)) {
+    return arrayToList([false, `form '${formName}' already exists in my-eval. Define a helper function instead, or use edit-eval! to replace the entire evaluator.`]);
+  }
+
+  // Find insertion point: before the final (else ... (my-apply ...)) clause
+  const applyIndex = currentSource.lastIndexOf('(my-apply');
+  if (applyIndex === -1) {
+    return arrayToList([false, 'extend-eval! failed: could not find my-apply in eval source']);
+  }
+  const elseIndex = currentSource.lastIndexOf('(else', applyIndex);
+  if (elseIndex === -1) {
+    return arrayToList([false, 'extend-eval! failed: could not find else clause in eval source']);
+  }
+
+  // Find start of the line containing (else to determine indentation
+  let lineStart = elseIndex;
+  while (lineStart > 0 && currentSource[lineStart - 1] !== '\n') lineStart--;
+  const indent = currentSource.slice(lineStart, elseIndex);
+
+  // Build the new clause with matching indentation
+  const newClause = `${indent}((eq? head '${formName}) ${bodyStr})\n`;
+  const newSource = currentSource.slice(0, lineStart) + newClause + currentSource.slice(lineStart);
+
+  const backup = ctx.myEvalSource;
+  try {
+    // Parse and evaluate the new eval definition
+    const exprs = parseAll(newSource);
+    for (const e of exprs) evaluate(e, env, {...ctx, steps: 0, stepLimit: 2000});
+
+    // Sanity tests in isolated environment
+    const testEnv = makeEnv(ctx.baseEnv);
+    installPrimitives(testEnv);
+    installMetaPrimitives(testEnv);
+    const helpers = parseAll(MY_EVAL_HELPERS);
+    const helperCtx = {steps: 0, stepLimit: 2000, baseEnv: testEnv, myEvalSource: newSource};
+    for (const h of helpers) evaluate(h, testEnv, helperCtx);
+    const newExprs = parseAll(newSource);
+    for (const e of newExprs) evaluate(e, testEnv, helperCtx);
+
+    const myEvalFn = envLookup(testEnv, 'my-eval');
+    const tests = [
+      {expr: '42', env: 'empty', expected: 42},
+      {expr: '(+ 1 2)', env: 'base', expected: 3},
+      {expr: '(if #t 1 2)', env: 'base', expected: 1},
+      {expr: '((lambda (x) x) 5)', env: 'base', expected: 5},
+    ];
+    for (const t of tests) {
+      const testExprParsed = parseOne(t.expr);
+      const tEnv = t.env === 'empty' ? makeEnv(null) : testEnv;
+      const tCtx = {steps: 0, stepLimit: 500, baseEnv: testEnv, myEvalSource: newSource};
+      const result = applyProc(myEvalFn, [testExprParsed, tEnv], tCtx);
+      if (!lispEqual(result, t.expected)) {
+        throw new Error(`sanity test failed: ${t.expr} => ${lispToString(result)}, expected ${t.expected}`);
+      }
+    }
+
+    // All passed — commit the change
+    ctx.myEvalSource = newSource;
+    const realExprs = parseAll(newSource);
+    for (const e of realExprs) evaluate(e, env, {steps: 0, stepLimit: 2000, baseEnv: ctx.baseEnv, myEvalSource: newSource});
+
+    return arrayToList([true, makeSym('eval-extended')]);
+  } catch (e) {
+    ctx.myEvalSource = backup;
+    return arrayToList([false, 'extend-eval! failed: ' + (e.message || String(e))]);
+  }
+}
+
+// ============================================================
+// EVALUATE VIA MY-EVAL — routes expressions through metacircular evaluator
+// ============================================================
+
+function evaluateViaMyEval(expr, env, ctx) {
+  try {
+    const myEvalFn = envLookup(env, 'my-eval');
+    return applyProc(myEvalFn, [expr, env], ctx);
+  } catch (e) {
+    // Fallback to ground eval if my-eval not yet installed
+    if (e.message && e.message.includes('unbound variable: my-eval')) {
+      return evaluate(expr, env, ctx);
+    }
+    throw e;
+  }
+}
+
+// ============================================================
+// PROBLEM BANK
+// ============================================================
+
+const PROBLEMS = [
+  { id: 1, name: "Factorial", desc: "Define (factorial n) that returns n!. Example: (factorial 5) => 120", test: "(factorial 5)", expected: 120 },
+  { id: 2, name: "List sum", desc: "Define (list-sum lst) that returns the sum of a list. Example: (list-sum '(1 2 3 4)) => 10", test: "(list-sum '(1 2 3 4))", expected: 10 },
+  { id: 3, name: "List reverse", desc: "Define (my-reverse lst) that reverses a list. Example: (my-reverse '(1 2 3)) => (3 2 1)", test: "(my-reverse '(1 2 3))", expected: "(3 2 1)" },
+  { id: 4, name: "Fibonacci", desc: "Define (fib n) that returns the nth Fibonacci number (0-indexed). Example: (fib 10) => 55", test: "(fib 10)", expected: 55 },
+  { id: 5, name: "Filter odds", desc: "Define (filter-odds lst) that returns only odd numbers. Example: (filter-odds '(1 2 3 4 5 6)) => (1 3 5)", test: "(filter-odds '(1 2 3 4 5 6))", expected: "(1 3 5)" },
+  { id: 6, name: "Map square", desc: "Define (map-square lst) that squares each element. Example: (map-square '(1 2 3 4)) => (1 4 9 16)", test: "(map-square '(1 2 3 4))", expected: "(1 4 9 16)" },
+  { id: 7, name: "Zip two lists", desc: "Define (zip a b) that pairs corresponding elements. Example: (zip '(1 2 3) '(a b c)) => ((1 a) (2 b) (3 c))", test: "(zip '(1 2 3) '(a b c))", expected: "((1 a) (2 b) (3 c))" },
+  { id: 8, name: "Insert sorted", desc: "Define (insert-sorted n lst) that inserts n into a sorted list. Example: (insert-sorted 3 '(1 2 4 5)) => (1 2 3 4 5)", test: "(insert-sorted 3 '(1 2 4 5))", expected: "(1 2 3 4 5)" },
+  { id: 9, name: "Flatten nested", desc: "Define (flatten lst) that flattens a nested list. Example: (flatten '(1 (2 (3 4) 5) 6)) => (1 2 3 4 5 6)", test: "(flatten '(1 (2 (3 4) 5) 6))", expected: "(1 2 3 4 5 6)" },
+  { id: 10, name: "Partition", desc: "Define (partition pred lst) that splits list into two: elements satisfying pred and those not. Example: (partition (lambda (x) (> x 3)) '(1 5 2 4 3 6)) => ((5 4 6) (1 2 3))", test: "(partition (lambda (x) (> x 3)) '(1 5 2 4 3 6))", expected: "((5 4 6) (1 2 3))" },
+  { id: 11, name: "Run-length encoding", desc: "Define (rle lst) that run-length encodes a list. Example: (rle '(a a a b b c a a)) => ((3 a) (2 b) (1 c) (2 a))", test: "(rle '(a a a b b c a a))", expected: "((3 a) (2 b) (1 c) (2 a))" },
+  { id: 12, name: "Sliding window sums", desc: "Define (window-sums k lst) that returns sums of sliding windows of size k. Example: (window-sums 3 '(1 2 3 4 5)) => (6 9 12)", test: "(window-sums 3 '(1 2 3 4 5))", expected: "(6 9 12)" },
+  { id: 13, name: "Group-by", desc: "Define (group-by f lst) that groups elements by f's return value. Example: (group-by (lambda (x) (modulo x 3)) '(1 2 3 4 5 6 7 8 9)) => ((1 (1 4 7)) (2 (2 5 8)) (0 (3 6 9)))", test: "(group-by (lambda (x) (modulo x 3)) '(1 2 3 4 5 6 7 8 9))", expected: "((1 (1 4 7)) (2 (2 5 8)) (0 (3 6 9)))" },
+  { id: 14, name: "Tree depth", desc: "Define (tree-depth t) where a tree is either a leaf (number) or (list left right). Example: (tree-depth '(((1 2) 3) (4 (5 6)))) => 3", test: "(tree-depth '(((1 2) 3) (4 (5 6))))", expected: 3 },
+  { id: 15, name: "Unfold", desc: "Define (unfold pred f g seed) that builds a list: while (not (pred seed)), cons (f seed) and recur with (g seed). Example: (unfold (lambda (x) (> x 5)) (lambda (x) (* x x)) (lambda (x) (+ x 1)) 1) => (1 4 9 16 25)", test: "(unfold (lambda (x) (> x 5)) (lambda (x) (* x x)) (lambda (x) (+ x 1)) 1)", expected: "(1 4 9 16 25)" }
+];
+
+const HARD_PROBLEMS = [
+  { id: 101, name: "Tree map", desc: "Define (tree-map f t) where tree is a number (leaf) or (list left right). Apply f to each leaf. Example: (tree-map (lambda (x) (* x 2)) '((1 2) (3 4))) => ((2 4) (6 8))", test: "(tree-map (lambda (x) (* x 2)) '((1 2) (3 4)))", expected: "((2 4) (6 8))" },
+  { id: 102, name: "Tree fold", desc: "Define (tree-fold f init t) that folds over leaves left-to-right. Example: (tree-fold + 0 '((1 2) (3 4))) => 10", test: "(tree-fold + 0 '((1 2) (3 4)))", expected: 10 },
+  { id: 103, name: "Tree zip", desc: "Define (tree-zip t1 t2) that zips two same-shape trees into pairs. Example: (tree-zip '(1 (2 3)) '(a (b c))) => ((1 a) ((2 b) (3 c)))", test: "(tree-zip '(1 (2 3)) '(a (b c)))", expected: "((1 a) ((2 b) (3 c)))" },
+  { id: 104, name: "Balanced parens", desc: "Define (balanced? lst) where lst is a list of symbols 'open and 'close. Return #t if parens are balanced. Example: (balanced? '(open open close close)) => #t", test: "(balanced? '(open open close close))", expected: true },
+  { id: 105, name: "Eval arithmetic", desc: "Define (eval-arith expr) that evaluates arithmetic expressions like (+ 1 (* 2 3)) with +, *, -. Example: (eval-arith '(+ 1 (* 2 3))) => 7", test: "(eval-arith '(+ 1 (* 2 3)))", expected: 7 },
+  { id: 106, name: "State machine", desc: "Define (run-sm transitions start inputs) where transitions is ((state input next-state) ...). Return final state. Example: (run-sm '((a 0 b) (a 1 a) (b 0 a) (b 1 b)) 'a '(0 1 0 1)) => b", test: "(run-sm '((a 0 b) (a 1 a) (b 0 a) (b 1 b)) 'a '(0 1 0 1))", expected: "b" },
+  { id: 107, name: "Graph reachable", desc: "Define (reachable? graph start end) where graph is ((node (neighbors...)) ...). Example: (reachable? '((a (b c)) (b (d)) (c ()) (d (c))) 'a 'd) => #t", test: "(reachable? '((a (b c)) (b (d)) (c ()) (d (c))) 'a 'd)", expected: true },
+  { id: 108, name: "Transpose", desc: "Define (transpose m) that transposes a matrix (list of rows). Example: (transpose '((1 2 3) (4 5 6))) => ((1 4) (2 5) (3 6))", test: "(transpose '((1 2 3) (4 5 6)))", expected: "((1 4) (2 5) (3 6))" },
+  { id: 109, name: "Matrix multiply", desc: "Define (mat-mul a b) that multiplies two matrices. Example: (mat-mul '((1 2) (3 4)) '((5 6) (7 8))) => ((19 22) (43 50))", test: "(mat-mul '((1 2) (3 4)) '((5 6) (7 8)))", expected: "((19 22) (43 50))" },
+  { id: 110, name: "Pattern match", desc: "Define (match-list pat lst) where pat can contain '_ (wildcard) and '... (rest). Return #t if matches. Example: (match-list '(1 _ 3) '(1 2 3)) => #t", test: "(match-list '(1 _ 3) '(1 2 3))", expected: true },
+  { id: 111, name: "CPS transform add", desc: "Define (cps-add a b k) that computes (k (+ a b)) in continuation-passing style. Example: (cps-add 3 4 (lambda (x) (* x 2))) => 14", test: "(cps-add 3 4 (lambda (x) (* x 2)))", expected: 14 },
+  { id: 112, name: "Memoized fib", desc: "Define (fast-fib n) using memoization via an accumulator or iterative approach. Must handle n=30 within step budget. Example: (fast-fib 30) => 832040", test: "(fast-fib 30)", expected: 832040 },
+  { id: 113, name: "Church numerals", desc: "Define (church n) returning a Church numeral, and (unchurch c) converting back. Example: (unchurch (church 3)) => 3", test: "(unchurch (church 3))", expected: 3 },
+  { id: 114, name: "Topological sort", desc: "Define (topo-sort edges) where edges is ((a b) ...) meaning a depends on b. Return a valid order. Example: (topo-sort '((b a) (c b) (d c))) => (a b c d)", test: "(topo-sort '((b a) (c b) (d c)))", expected: "(a b c d)" },
+  { id: 115, name: "Power set", desc: "Define (power-set lst) that returns all subsets. Example: (power-set '(1 2 3)) => (() (3) (2) (2 3) (1) (1 3) (1 2) (1 2 3))", test: "(power-set '(1 2 3))", expected: "(() (3) (2) (2 3) (1) (1 3) (1 2) (1 2 3))" },
+  { id: 116, name: "Permutations", desc: "Define (permutations lst) that returns all permutations. Example: (length (permutations '(1 2 3))) => 6", test: "(length (permutations '(1 2 3)))", expected: 6 },
+  { id: 117, name: "Reduce right", desc: "Define (fold-right f init lst) that folds from the right. Example: (fold-right cons '() '(1 2 3)) => (1 2 3)", test: "(fold-right cons '() '(1 2 3))", expected: "(1 2 3)" },
+  { id: 118, name: "Compose", desc: "Define (compose f g) returning a function that applies g then f. Example: ((compose (lambda (x) (* x 2)) (lambda (x) (+ x 1))) 3) => 8", test: "((compose (lambda (x) (* x 2)) (lambda (x) (+ x 1))) 3)", expected: 8 },
+  { id: 119, name: "Scan left", desc: "Define (scan-left f init lst) that returns running accumulations. Example: (scan-left + 0 '(1 2 3 4)) => (0 1 3 6 10)", test: "(scan-left + 0 '(1 2 3 4))", expected: "(0 1 3 6 10)" },
+  { id: 120, name: "Interleave", desc: "Define (interleave a b) that interleaves two lists. Example: (interleave '(1 2 3) '(a b c)) => (1 a 2 b 3 c)", test: "(interleave '(1 2 3) '(a b c))", expected: "(1 a 2 b 3 c)" },
+];
+
+const EVOLUTION_PROBLEMS = [
+  { id: 201, name: "Symbolic deriv", desc: "Define (deriv expr var) that symbolically differentiates. Example: (deriv '(* x x) 'x) => (+ (* x 1) (* 1 x))", test: "(deriv '(* x x) 'x)", expected: "(+ (* x 1) (* 1 x))" },
+  { id: 202, name: "Simplify arith", desc: "Define (simplify expr) that simplifies arithmetic: (+ 0 x)=>x, (* 1 x)=>x, (* 0 x)=>0. Example: (simplify '(+ 0 (* 1 x))) => x", test: "(simplify '(+ 0 (* 1 x)))", expected: "x" },
+  { id: 203, name: "Eval with bindings", desc: "Define (eval-expr expr bindings) that evaluates arithmetic with variable bindings. Example: (eval-expr '(+ x (* y 2)) '((x 3) (y 4))) => 11", test: "(eval-expr '(+ x (* y 2)) '((x 3) (y 4)))", expected: 11 },
+  { id: 204, name: "Expr substitute", desc: "Define (subst-expr var val expr) that substitutes var with val in expr tree. Example: (subst-expr 'x 42 '(+ x (* x y))) => (+ 42 (* 42 y))", test: "(subst-expr 'x 42 '(+ x (* x y)))", expected: "(+ 42 (* 42 y))" },
+  { id: 205, name: "Free variables", desc: "Define (free-vars expr) that returns free variables in a lambda expression. Example: (free-vars '(lambda (x) (+ x y))) => (y)", test: "(free-vars '(lambda (x) (+ x y)))", expected: "(y)" },
+  { id: 206, name: "Expand let", desc: "Define (expand-let expr) that expands let to lambda application. Example: (expand-let '(let ((x 1) (y 2)) (+ x y))) => ((lambda (x y) (+ x y)) 1 2)", test: "(expand-let '(let ((x 1) (y 2)) (+ x y)))", expected: "((lambda (x y) (+ x y)) 1 2)" },
+  { id: 207, name: "Apply rewrite", desc: "Define (apply-rules rules expr) where rules is (((+ 0 _) _) ...) patterns. Example: (apply-rules '(((+ 0 _) _)) '(+ 0 5)) => 5", test: "(apply-rules '(((+ 0 _) _)) '(+ 0 5))", expected: 5 },
+  { id: 208, name: "CPS transform", desc: "Define (cps-transform expr) that CPS-transforms a simple arithmetic expr into a function taking a continuation. Example: ((cps-transform '(+ 1 2)) (lambda (x) (* x 10))) => 30", test: "((cps-transform '(+ 1 2)) (lambda (x) (* x 10)))", expected: 30 },
+];
+
+const STRING_PROBLEMS = [
+  { id: 300, name: "String length", desc: "Define (char-count lst) that counts elements in a list (string-as-list). Example: (char-count '(h e l l o)) => 5", test: "(char-count '(h e l l o))", expected: 5 },
+  { id: 301, name: "Palindrome?", desc: "Define (palindrome? lst) that checks if a list reads the same forwards and backwards. Example: (palindrome? '(r a c e c a r)) => #t", test: "(palindrome? '(r a c e c a r))", expected: true },
+  { id: 302, name: "Caesar cipher", desc: "Define (caesar-shift n lst) that shifts each number in lst by n (mod 26). Example: (caesar-shift 3 '(0 1 2 25)) => (3 4 5 2)", test: "(caesar-shift 3 '(0 1 2 25))", expected: "(3 4 5 2)" },
+  { id: 303, name: "Run-length decode", desc: "Define (rle-decode lst) that decodes run-length encoded list. Example: (rle-decode '((3 a) (2 b) (1 c))) => (a a a b b c)", test: "(rle-decode '((3 a) (2 b) (1 c)))", expected: "(a a a b b c)" },
+  { id: 304, name: "Char frequency", desc: "Define (char-freq lst) that returns list of (char count) pairs sorted by count descending. Example: (char-freq '(a b a c a b)) => ((a 3) (b 2) (c 1))", test: "(char-freq '(a b a c a b))", expected: "((a 3) (b 2) (c 1))" },
+  { id: 305, name: "Remove duplicates", desc: "Define (remove-dups lst) that removes consecutive duplicates. Example: (remove-dups '(a a b b b c a a)) => (a b c a)", test: "(remove-dups '(a a b b b c a a))", expected: "(a b c a)" },
+  { id: 306, name: "Take-while", desc: "Define (take-while pred lst) that takes elements while pred is true. Example: (take-while (lambda (x) (< x 4)) '(1 2 3 5 2 1)) => (1 2 3)", test: "(take-while (lambda (x) (< x 4)) '(1 2 3 5 2 1))", expected: "(1 2 3)" },
+  { id: 307, name: "Drop-while", desc: "Define (drop-while pred lst) that drops elements while pred is true. Example: (drop-while (lambda (x) (< x 4)) '(1 2 3 5 2 1)) => (5 2 1)", test: "(drop-while (lambda (x) (< x 4)) '(1 2 3 5 2 1))", expected: "(5 2 1)" },
+  { id: 308, name: "Intersperse", desc: "Define (intersperse sep lst) that puts sep between each element. Example: (intersperse 0 '(1 2 3 4)) => (1 0 2 0 3 0 4)", test: "(intersperse 0 '(1 2 3 4))", expected: "(1 0 2 0 3 0 4)" },
+  { id: 309, name: "Chunk list", desc: "Define (chunk n lst) that splits list into sublists of size n. Example: (chunk 2 '(1 2 3 4 5 6)) => ((1 2) (3 4) (5 6))", test: "(chunk 2 '(1 2 3 4 5 6))", expected: "((1 2) (3 4) (5 6))" },
+];
+
+const HIGHER_ORDER_PROBLEMS = [
+  { id: 400, name: "Curry", desc: "Define (curry f) that converts a 2-arg function to curried form. Example: ((curry +) 3) returns a function, then (((curry +) 3) 4) => 7", test: "(((curry +) 3) 4)", expected: 7 },
+  { id: 401, name: "Iterate-n", desc: "Define (iterate-n f n x) that applies f to x n times. Example: (iterate-n (lambda (x) (* x 2)) 4 1) => 16", test: "(iterate-n (lambda (x) (* x 2)) 4 1)", expected: 16 },
+  { id: 402, name: "Complement", desc: "Define (complement f) that returns a function negating f. Example: ((complement (lambda (x) (> x 3))) 2) => #t", test: "((complement (lambda (x) (> x 3))) 2)", expected: true },
+  { id: 403, name: "Juxt", desc: "Define (juxt f g) that returns a function applying both and returning results as list. Example: ((juxt (lambda (x) (+ x 1)) (lambda (x) (* x 2))) 3) => (4 6)", test: "((juxt (lambda (x) (+ x 1)) (lambda (x) (* x 2))) 3)", expected: "(4 6)" },
+  { id: 404, name: "Pipe", desc: "Define (pipe fns) taking a list of functions and returning their left-to-right composition. Example: ((pipe (list (lambda (x) (+ x 1)) (lambda (x) (* x 2)))) 3) => 8", test: "((pipe (list (lambda (x) (+ x 1)) (lambda (x) (* x 2)))) 3)", expected: 8 },
+  { id: 405, name: "Every?", desc: "Define (every? pred lst) that returns #t if pred is true for all elements. Example: (every? (lambda (x) (> x 0)) '(1 2 3)) => #t", test: "(every? (lambda (x) (> x 0)) '(1 2 3))", expected: true },
+  { id: 406, name: "Some?", desc: "Define (some? pred lst) that returns first truthy result of pred, or #f. Example: (some? (lambda (x) (> x 3)) '(1 2 4 5)) => #t", test: "(some? (lambda (x) (> x 3)) '(1 2 4 5))", expected: true },
+  { id: 407, name: "Map-indexed", desc: "Define (map-indexed f lst) where f takes index and element. Example: (map-indexed (lambda (i x) (+ i x)) '(10 20 30)) => (10 21 32)", test: "(map-indexed (lambda (i x) (+ i x)) '(10 20 30))", expected: "(10 21 32)" },
+  { id: 408, name: "Flat-map", desc: "Define (flat-map f lst) that maps f and flattens one level. Example: (flat-map (lambda (x) (list x (* x 10))) '(1 2 3)) => (1 10 2 20 3 30)", test: "(flat-map (lambda (x) (list x (* x 10))) '(1 2 3))", expected: "(1 10 2 20 3 30)" },
+  { id: 409, name: "Zip-with", desc: "Define (zip-with f a b) that combines lists elementwise using f. Example: (zip-with + '(1 2 3) '(10 20 30)) => (11 22 33)", test: "(zip-with + '(1 2 3) '(10 20 30))", expected: "(11 22 33)" },
+];
+
+const NUMBER_THEORY_PROBLEMS = [
+  { id: 500, name: "GCD", desc: "Define (gcd a b) using Euclid's algorithm. Example: (gcd 48 18) => 6", test: "(gcd 48 18)", expected: 6 },
+  { id: 501, name: "Prime?", desc: "Define (prime? n) that returns #t if n is prime. Example: (prime? 17) => #t", test: "(prime? 17)", expected: true },
+  { id: 502, name: "Prime factors", desc: "Define (prime-factors n) that returns prime factorization. Example: (prime-factors 60) => (2 2 3 5)", test: "(prime-factors 60)", expected: "(2 2 3 5)" },
+  { id: 503, name: "Collatz length", desc: "Define (collatz-length n) returning steps to reach 1 in Collatz sequence. Example: (collatz-length 6) => 8", test: "(collatz-length 6)", expected: 8 },
+  { id: 504, name: "Digit sum", desc: "Define (digit-sum n) that sums the digits of n. Example: (digit-sum 12345) => 15", test: "(digit-sum 12345)", expected: 15 },
+  { id: 505, name: "LCM", desc: "Define (lcm a b) returning least common multiple. Example: (lcm 12 18) => 36", test: "(lcm 12 18)", expected: 36 },
+  { id: 506, name: "Integer sqrt", desc: "Define (isqrt n) returning floor of square root. Example: (isqrt 26) => 5", test: "(isqrt 26)", expected: 5 },
+  { id: 507, name: "Sieve primes", desc: "Define (primes-up-to n) returning list of primes up to n. Example: (primes-up-to 20) => (2 3 5 7 11 13 17 19)", test: "(primes-up-to 20)", expected: "(2 3 5 7 11 13 17 19)" },
+  { id: 508, name: "Modular exp", desc: "Define (modpow base exp mod) that computes base^exp mod mod efficiently. Example: (modpow 2 10 1000) => 24", test: "(modpow 2 10 1000)", expected: 24 },
+  { id: 509, name: "Euler totient", desc: "Define (totient n) returning count of integers 1..n coprime to n. Example: (totient 12) => 4", test: "(totient 12)", expected: 4 },
+];
+
+const RECURSIVE_STRUCTURE_PROBLEMS = [
+  { id: 600, name: "Binary search", desc: "Define (binary-search lst target) on a sorted list returning index or -1. Example: (binary-search '(1 3 5 7 9 11) 7) => 3", test: "(binary-search '(1 3 5 7 9 11) 7)", expected: 3 },
+  { id: 601, name: "Merge sort", desc: "Define (merge-sort lst) that sorts a list using merge sort. Example: (merge-sort '(5 3 8 1 9 2)) => (1 2 3 5 8 9)", test: "(merge-sort '(5 3 8 1 9 2))", expected: "(1 2 3 5 8 9)" },
+  { id: 602, name: "Tree insert BST", desc: "Define (bst-insert val tree) where tree is () or (val left right). Example: (bst-insert 3 '(5 (2 () ()) (7 () ()))) => (5 (2 () (3 () ())) (7 () ()))", test: "(bst-insert 3 '(5 (2 () ()) (7 () ())))", expected: "(5 (2 () (3 () ())) (7 () ()))" },
+  { id: 603, name: "Tree flatten", desc: "Define (tree-flatten tree) that returns in-order traversal of BST. Example: (tree-flatten '(5 (2 (1 () ()) (3 () ())) (7 () ()))) => (1 2 3 5 7)", test: "(tree-flatten '(5 (2 (1 () ()) (3 () ())) (7 () ())))", expected: "(1 2 3 5 7)" },
+  { id: 604, name: "Tree paths", desc: "Define (tree-paths tree) returning all root-to-leaf paths. Tree is atom (leaf) or (list left right). Example: (tree-paths '((1 2) (3 4))) => ((0 0) (0 1) (1 0) (1 1))", test: "(length (tree-paths '((1 2) (3 4))))", expected: 4 },
+  { id: 605, name: "BST contains?", desc: "Define (bst-contains? val tree) where tree is () or (val left right). Example: (bst-contains? 3 '(5 (2 () (3 () ())) (7 () ()))) => #t", test: "(bst-contains? 3 '(5 (2 () (3 () ())) (7 () ())))", expected: true },
+  { id: 606, name: "List to BST", desc: "Define (list-to-bst lst) that builds a BST by inserting each element. Example: (tree-flatten (list-to-bst '(5 3 7 1 4))) => (1 3 4 5 7)", test: "(tree-flatten (list-to-bst '(5 3 7 1 4)))", expected: "(1 3 4 5 7)" },
+  { id: 607, name: "Maximum sublist sum", desc: "Define (max-sublist-sum lst) that returns the maximum sum of any contiguous sublist (Kadane's). Example: (max-sublist-sum '(-2 1 -3 4 -1 2 1 -5 4)) => 6", test: "(max-sublist-sum '(-2 1 -3 4 -1 2 1 -5 4))", expected: 6 },
+  { id: 608, name: "N-queens count", desc: "Define (n-queens-count n) returning number of solutions to n-queens. Example: (n-queens-count 4) => 2", test: "(n-queens-count 4)", expected: 2 },
+  { id: 609, name: "Insertion sort", desc: "Define (insertion-sort lst) that sorts using insertion sort. Example: (insertion-sort '(4 2 7 1 3)) => (1 2 3 4 7)", test: "(insertion-sort '(4 2 7 1 3))", expected: "(1 2 3 4 7)" },
+];
+
+const LOGIC_PROBLEMS = [
+  { id: 700, name: "Truth table", desc: "Define (truth-table f) for a 2-arg boolean function, returning all input/output combos. Example: (truth-table (lambda (a b) (and a b))) => ((#t #t #t) (#t #f #f) (#f #t #f) (#f #f #f))", test: "(truth-table (lambda (a b) (and a b)))", expected: "((#t #t #t) (#t #f #f) (#f #t #f) (#f #f #f))" },
+  { id: 701, name: "Implies?", desc: "Define (implies? a b) that returns (not a) or b. Example: (implies? #f #f) => #t", test: "(implies? #f #f)", expected: true },
+  { id: 702, name: "XOR", desc: "Define (xor a b) that returns #t if exactly one is true. Example: (xor #t #f) => #t", test: "(xor #t #f)", expected: true },
+  { id: 703, name: "All-true?", desc: "Define (all-true? lst) that returns #t if all elements are #t. Example: (all-true? '(#t #t #f #t)) => #f", test: "(all-true? '(#t #t #f #t))", expected: false },
+  { id: 704, name: "Count-true", desc: "Define (count-true lst) that counts #t values. Example: (count-true '(#t #f #t #t #f)) => 3", test: "(count-true '(#t #f #t #t #f))", expected: 3 },
+  { id: 705, name: "Eval boolean", desc: "Define (eval-bool expr) for (and/or/not ...) expressions. Example: (eval-bool '(and #t (or #f #t))) => #t", test: "(eval-bool '(and #t (or #f #t)))", expected: true },
+  { id: 706, name: "Substitution", desc: "Define (subst-all subs lst) that replaces symbols using substitution list. Example: (subst-all '((x 1) (y 2)) '(+ x y)) => (+ 1 2)", test: "(subst-all '((x 1) (y 2)) '(+ x y))", expected: "(+ 1 2)" },
+  { id: 707, name: "De Morgan", desc: "Define (de-morgan expr) that applies De Morgan's laws: (not (and a b)) => (or (not a) (not b)). Example: (de-morgan '(not (and x y))) => (or (not x) (not y))", test: "(de-morgan '(not (and x y)))", expected: "(or (not x) (not y))" },
+  { id: 708, name: "Tautology check", desc: "Define (tautology? f) for a 2-arg boolean fn, returns #t if true for all inputs. Example: (tautology? (lambda (a b) (or a (not a)))) => #t", test: "(tautology? (lambda (a b) (or a (not a))))", expected: true },
+  { id: 709, name: "Satisfiable?", desc: "Define (satisfiable? f) for a 2-arg boolean fn, returns #t if any input combo gives #t. Example: (satisfiable? (lambda (a b) (and a b))) => #t", test: "(satisfiable? (lambda (a b) (and a b)))", expected: true },
+];
+
+const META_PROBLEMS = [
+  { id: 800, name: "Make accumulator", desc: "Define (make-accumulator init) returning a function that adds to running total. Example: (let ((acc (make-accumulator 5))) (begin (acc 10) (acc 20))) => 35", test: "(let ((acc (make-accumulator 5))) (begin (acc 10) (acc 20)))", expected: 35 },
+  { id: 801, name: "Make counter", desc: "Define (make-counter) returning a function that returns incrementing values. Example: (let ((c (make-counter))) (begin (c) (c) (c))) => 3", test: "(let ((c (make-counter))) (begin (c) (c) (c)))", expected: 3 },
+  { id: 802, name: "Church add", desc: "Define Church numerals: (church n), (church-add a b), (unchurch c). Example: (unchurch (church-add (church 2) (church 3))) => 5", test: "(unchurch (church-add (church 2) (church 3)))", expected: 5 },
+  { id: 803, name: "Church mul", desc: "Define (church-mul a b) for Church numeral multiplication. Example: (unchurch (church-mul (church 3) (church 4))) => 12", test: "(unchurch (church-mul (church 3) (church 4)))", expected: 12 },
+  { id: 804, name: "Make stack", desc: "Define (make-stack) returning a dispatch: (s 'push val), (s 'pop), (s 'peek), (s 'size). Example: (let ((s (make-stack))) (begin (s 'push 1) (s 'push 2) (s 'push 3) (s 'size))) => 3", test: "(let ((s (make-stack))) (begin (s 'push 1) (s 'push 2) (s 'push 3) (s 'size)))", expected: 3 },
+  { id: 805, name: "Y combinator", desc: "Define Y combinator and use it: (define Y ...) then ((Y (lambda (f) (lambda (n) (if (< n 2) 1 (* n (f (- n 1))))))) 5) => 120", test: "((Y (lambda (f) (lambda (n) (if (< n 2) 1 (* n (f (- n 1))))))) 5)", expected: 120 },
+  { id: 806, name: "Make-memo", desc: "Define (make-memo f) that returns a memoized version of f (using list-based cache). Example: (let ((mf (make-memo (lambda (x) (* x x))))) (begin (mf 4) (mf 4))) => 16", test: "(let ((mf (make-memo (lambda (x) (* x x))))) (begin (mf 4) (mf 4)))", expected: 16 },
+  { id: 807, name: "Make-lazy", desc: "Define (make-lazy thunk) that delays computation until forced with (force-lazy l). Example: (force-lazy (make-lazy (lambda () (+ 1 2)))) => 3", test: "(force-lazy (make-lazy (lambda () (+ 1 2))))", expected: 3 },
+  { id: 808, name: "Self-apply", desc: "Define (self-apply f) as (f f). Example: (self-apply (lambda (x) 42)) => 42", test: "(self-apply (lambda (x) 42))", expected: 42 },
+  { id: 809, name: "Fix-point", desc: "Define (fix-point f start) that repeatedly applies f until value doesn't change. Example: (fix-point (lambda (x) (if (> x 100) x (+ x x))) 1) => 128", test: "(fix-point (lambda (x) (if (> x 100) x (+ x x))) 1)", expected: 128 },
+];
+
+const ALL_PROBLEM_POOLS = [
+  {name: 'standard', problems: PROBLEMS},
+  {name: 'hard', problems: HARD_PROBLEMS},
+  {name: 'evolution', problems: EVOLUTION_PROBLEMS},
+  {name: 'string', problems: STRING_PROBLEMS},
+  {name: 'higher-order', problems: HIGHER_ORDER_PROBLEMS},
+  {name: 'number-theory', problems: NUMBER_THEORY_PROBLEMS},
+  {name: 'recursive', problems: RECURSIVE_STRUCTURE_PROBLEMS},
+  {name: 'logic', problems: LOGIC_PROBLEMS},
+  {name: 'meta', problems: META_PROBLEMS},
+];
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildProblemList(round) {
+  if (round <= 1) return PROBLEMS;
+  // For round 2+, draw from all pools with increasing difficulty
+  let numStandard, numHard, numEvolution, numNew;
+  if (round === 2) { numStandard = 5; numHard = 4; numEvolution = 2; numNew = 4; }
+  else if (round === 3) { numStandard = 3; numHard = 4; numEvolution = 3; numNew = 5; }
+  else { numStandard = 2; numHard = 3; numEvolution = 3; numNew = 7; }
+  const standard = shuffleArray(PROBLEMS).slice(0, numStandard);
+  const hard = shuffleArray(HARD_PROBLEMS).slice(0, numHard);
+  const evolution = shuffleArray(EVOLUTION_PROBLEMS).slice(0, numEvolution);
+  // Draw from new pools evenly
+  const newPools = [STRING_PROBLEMS, HIGHER_ORDER_PROBLEMS, NUMBER_THEORY_PROBLEMS,
+    RECURSIVE_STRUCTURE_PROBLEMS, LOGIC_PROBLEMS, META_PROBLEMS];
+  const allNew = newPools.flatMap(p => shuffleArray(p));
+  const newProblems = shuffleArray(allNew).slice(0, numNew);
+  return shuffleArray([...standard, ...hard, ...evolution, ...newProblems]);
+}
+
+function buildTournamentProblemSet(generation, round) {
+  // Draw 15 problems per round with controlled diversity (at least 1 from each category)
+  const pools = ALL_PROBLEM_POOLS;
+  let selected = [];
+  // Guarantee at least 1 from each category
+  for (const pool of pools) {
+    selected.push(shuffleArray(pool.problems)[0]);
+  }
+  // Fill remaining 6 slots from the full pool, biased by generation
+  const allProblems = pools.flatMap(p => p.problems);
+  const remaining = shuffleArray(allProblems.filter(p => !selected.find(s => s.id === p.id)));
+  selected = selected.concat(remaining.slice(0, 15 - selected.length));
+  return shuffleArray(selected);
+}
+
+// ============================================================
+// AGENT LOOP
+// ============================================================
+
+const CELL_BUDGET = 25;
+const BASE_STEP_BUDGET = 1500;
+const NATIVE_CAP_PER_ROUND = [Infinity, 10, 5, 3]; // indexed by round, R4+ uses 3
+function nativeCapForRound(round) { return NATIVE_CAP_PER_ROUND[Math.min(round, 3)] || 3; }
+const EVAL_EDIT_BONUS = 150;
+
+function computeStepBudget(round) {
+  if (round <= 1) return 1500;
+  if (round === 2) return 1200;
+  if (round === 3) return 1000;
+  return Math.max(600, 1500 - (round - 1) * 200);
+}
+
+// Known standard Lisp forms — if an eval edit adds one of these, it's "repair" not "novel"
+const STANDARD_LISP_FORMS = new Set([
+  'let*', 'letrec', 'case', 'do', 'and', 'or', 'cond', 'set!', 'when', 'unless',
+  'define', 'lambda', 'begin', 'if', 'quote', 'let', 'quasiquote', 'unquote',
+  'define-macro', 'syntax-rules', 'match', 'delay', 'force', 'call/cc',
+  'call-with-current-continuation', 'dynamic-wind', 'values', 'receive',
+  'do', 'named-let', 'rec', 'loop', 'for-each', 'dotimes',
+]);
+
+function classifyEvalEdit(newSource, oldSource) {
+  // Find form names in new source not in old source
+  // Handles both 'name and (quote name) forms since lispToString converts quotes
+  const extractFormNames = (src) => {
+    const names = new Set();
+    // Match (eq? head 'name) — original source form
+    for (const m of src.matchAll(/\(eq\?\s+head\s+'([a-zA-Z_*?!+\-/=<>0-9]+)\)/g)) names.add(m[1]);
+    // Match (eq? head (quote name)) — lispToString form
+    for (const m of src.matchAll(/\(eq\?\s+head\s+\(quote\s+([a-zA-Z_*?!+\-/=<>0-9]+)\)\)/g)) names.add(m[1]);
+    return names;
+  };
+  const newForms = extractFormNames(newSource);
+  const oldForms = extractFormNames(oldSource);
+  const added = [...newForms].filter(f => !oldForms.has(f));
+  const novel = added.filter(f => !STANDARD_LISP_FORMS.has(f));
+  const repair = added.filter(f => STANDARD_LISP_FORMS.has(f));
+  return {novel, repair, added};
+}
+
+const METACOGNITIVE_FORMS = new Set([
+  'goal', 'sub', 'try', 'note', 'check', 'done',
+  'show-eval', 'edit-eval!', 'extend-eval!', 'show-env', 'eval-in', 'with-limit',
+  'defnative!', 'show-helpers'
+]);
+
+function createAgentState() {
+  return {
+    running: false,
+    paused: false,
+    problemIndex: 0,
+    scratchpad: [],
+    cellsUsed: 0,
+    stepsUsed: 0,
+    stepBudget: BASE_STEP_BUDGET,
+    myEvalSource: MY_EVAL_SEED,
+    evalHistory: [{problem: 0, source: MY_EVAL_SEED, lines: MY_EVAL_SEED.trim().split('\n').length, avgSteps: 0, label: 'seed'}],
+    stats: {solved: 0, failed: 0, editsAttempted: 0, editsAccepted: 0, nativeDefs: 0, nativeNames: [], helperReuses: 0, uniqueConstructs: []},
+    nativeDefsThisRound: 0,
+    bonusStepsEarned: 0,
+    status: 'idle',
+    env: null,
+    baseEnv: null,
+    problemHistory: [],  // {problemId, name, scratchpad, solved, cellsUsed, stepsUsed}
+    persistentDefs: {},  // name → {expr, isNative, nativeFn}
+    round: 1,
+    failureNote: null,
+    currentProblems: null, // will be set per round
+    reflectionDone: false,
+  };
+}
+
+function initEnv(state) {
+  const baseEnv = makeEnv(null);
+  installPrimitives(baseEnv);
+  installMetaPrimitives(baseEnv);
+  state.baseEnv = baseEnv;
+
+  const agentEnv = makeEnv(baseEnv);
+  state.env = agentEnv;
+
+  // Install helpers + seed my-eval
+  const allSource = MY_EVAL_HELPERS + '\n' + state.myEvalSource;
+  const exprs = parseAll(allSource);
+  const ctx = {steps: 0, stepLimit: 5000, baseEnv, myEvalSource: state.myEvalSource};
+  for (const e of exprs) evaluate(e, agentEnv, ctx);
+}
+
+// ============================================================
+// TOURNAMENT SELECTION ENGINE
+// ============================================================
+
+function createTournamentState() {
+  return {
+    mode: 'tournament',
+    generation: 1,
+    lineagesPerGen: 4,
+    roundsPerLineage: 3,
+    lineages: [],
+    currentLineageIdx: 0,
+    hallOfFame: [],
+    genHistory: [],
+    running: false,
+    status: 'idle',
+    generatedProblems: [],
+  };
+}
+
+const LINEAGE_PERSONALITIES = [
+  'You have a strong instinct for RECURSION — you see recursive structure everywhere and prefer recursive solutions. When extending your evaluator, think about recursive patterns like tree walks, nested folds, and structural recursion.',
+  'You favor HIGHER-ORDER ABSTRACTIONS — composing functions, building pipelines, and creating reusable combinators. When extending your evaluator, think about forms like compose, pipe, partial, and function transformers.',
+  'You think in terms of PATTERN MATCHING and DATA TRANSFORMATION — destructuring inputs, matching shapes, and transforming structures. When extending your evaluator, think about forms like match, transform, and destructuring-bind.',
+  'You value COMPACTNESS and ELEGANCE — every construct should earn its place by eliminating boilerplate. When extending your evaluator, think about syntactic sugar, short-hands, and forms that compress common multi-step patterns into single expressions.',
+  'You are drawn to STATE and ACCUMULATION patterns — loops with accumulators, mutable bindings, iterative refinement. When extending your evaluator, think about forms like for-each with accumulation, reduce variants, and stateful iteration.',
+  'You think in terms of LAZY EVALUATION and STREAMS — deferring computation, generating sequences on demand. When extending your evaluator, think about forms like delay/force, lazy-seq, take, and infinite generators.',
+  'You favor DECLARATIVE problem descriptions — saying WHAT you want rather than HOW to compute it. When extending your evaluator, think about forms like where-clauses, list comprehensions, guard expressions, and constraint-based patterns.',
+  'You think in terms of ALGEBRAIC STRUCTURE — monoids, folds, mappings between types. When extending your evaluator, think about forms that capture algebraic patterns like mappend, mempty, fmap, and generalized fold.',
+];
+
+function createLineageState(seed, personalityIdx) {
+  const s = createAgentState();
+  if (seed) {
+    s.myEvalSource = seed.evalSource;
+    s.evalHistory = [{problem: 0, source: seed.evalSource, lines: seed.evalSource.trim().split('\n').length, avgSteps: 0, label: `gen ${seed.gen} seed`}];
+  }
+  const personality = LINEAGE_PERSONALITIES[personalityIdx % LINEAGE_PERSONALITIES.length];
+  return {
+    id: Math.random().toString(36).slice(2, 10),
+    agentState: s,
+    fitness: null,
+    problemResults: [],
+    personality,
+  };
+}
+
+function computeFitness(lineage) {
+  const s = lineage.agentState;
+  const totalProblems = s.stats.solved + s.stats.failed;
+  if (totalProblems === 0) return 0;
+
+  // Raw solve count is king — solving 10 problems is better than solving 3 "efficiently"
+  const solveCount = s.stats.solved;
+  const maxExpected = 15; // problems per round × rounds
+  const solveScore = Math.min(1, solveCount / maxExpected);
+
+  const novelCount = (s.stats.uniqueConstructs || []).length;
+  const evalLines = Math.max(s.myEvalSource.trim().split('\n').length, Math.ceil(s.myEvalSource.length / 60));
+
+  const solvedCategories = new Set(lineage.problemResults.filter(r => r.solved).map(r => {
+    const id = r.problemId;
+    if (id < 100) return 'standard';
+    if (id < 200) return 'hard';
+    if (id < 300) return 'evolution';
+    if (id < 400) return 'string';
+    if (id < 500) return 'higher-order';
+    if (id < 600) return 'number-theory';
+    if (id < 700) return 'recursive';
+    if (id < 800) return 'logic';
+    return 'meta';
+  }));
+  const diversity = solvedCategories.size / 9;
+
+  // Evolution bonus: reward lineages that actually modified their eval
+  const evolved = evalLines > 54 || novelCount > 0;
+  const evolutionBonus = evolved ? 0.10 : 0;
+
+  return (
+    0.55 * solveScore +                        // raw solve count dominates
+    0.15 * Math.min(1, novelCount / 8) +        // novel constructs
+    0.10 * diversity +                           // category breadth
+    0.10 * Math.min(1, evalLines / 100) +        // eval richness
+    evolutionBonus                               // bonus for actually evolving
+  );
+}
+
+// TODO: Phase 5 — LLM-generated co-evolutionary problems
+// async function generateProblems(evalSource, hallOfFame, apiKey, endpoint, model) { ... }
+
+async function runTournament(tournState, apiKey, endpoint, model, onUpdate, shouldContinue) {
+  tournState.running = true;
+  onUpdate({...tournState});
+
+  while (shouldContinue()) {
+    // --- Initialize lineages for this generation ---
+    // Elitism: always seed from all-time best, not just last generation
+    const seed = tournState.hallOfFame.length > 0
+      ? tournState.hallOfFame.reduce((best, h) => h.fitness > best.fitness ? h : best)
+      : null;
+
+    // Generate problem sets ONCE per generation — all lineages face the same challenges
+    const genProblemSets = [];
+    for (let r = 0; r < tournState.roundsPerLineage; r++) {
+      genProblemSets.push(buildTournamentProblemSet(tournState.generation, r + 1));
+    }
+
+    tournState.lineages = [];
+    for (let i = 0; i < tournState.lineagesPerGen; i++) {
+      tournState.lineages.push(createLineageState(seed, i));
+    }
+    tournState.currentLineageIdx = 0;
+    onUpdate({...tournState});
+
+    // --- Run each lineage for N rounds ---
+    for (let li = 0; li < tournState.lineages.length && shouldContinue(); li++) {
+      tournState.currentLineageIdx = li;
+      tournState.status = `Gen ${tournState.generation} | Lineage ${li + 1}/${tournState.lineages.length}`;
+      onUpdate({...tournState});
+
+      const lineage = tournState.lineages[li];
+      const agentState = lineage.agentState;
+      initEnv(agentState);
+
+      // Install seed eval if present
+      if (agentState.myEvalSource !== MY_EVAL_SEED) {
+        const exprs = parseAll(agentState.myEvalSource);
+        const ctx = {steps: 0, stepLimit: 5000, baseEnv: agentState.baseEnv, myEvalSource: agentState.myEvalSource};
+        for (const expr of exprs) evaluate(expr, agentState.env, ctx);
+      }
+
+      // Run N rounds — all lineages get the same problem sets
+      for (let r = 0; r < tournState.roundsPerLineage && shouldContinue(); r++) {
+        if (r > 0) {
+          // Advance round
+          agentState.problemIndex = 0;
+          agentState.round++;
+          agentState.stepBudget = computeStepBudget(agentState.round);
+          agentState.failureNote = null;
+          agentState.reflectionDone = false;
+          agentState.nativeDefsThisRound = 0;
+        }
+        agentState.currentProblems = genProblemSets[r];
+        tournState.status = `Gen ${tournState.generation} | Lineage ${li + 1}/${tournState.lineages.length} | Round ${r + 1}/${tournState.roundsPerLineage}`;
+        onUpdate({...tournState});
+
+        await runAllProblems(agentState, apiKey, endpoint, model,
+          (ns) => {
+            tournState.lineages[li].agentState = ns;
+            onUpdate({...tournState});
+          },
+          shouldContinue,
+          lineage.personality
+        );
+      }
+
+      // Compute fitness
+      lineage.problemResults = agentState.problemHistory
+        .filter(h => !h.isReflection)
+        .map(h => ({problemId: h.problemId, solved: h.solved, stepsUsed: h.stepsUsed}));
+      lineage.fitness = computeFitness(lineage);
+    }
+
+    // --- Select winner ---
+    if (!shouldContinue()) break;
+    const sorted = [...tournState.lineages].sort((a, b) => (b.fitness || 0) - (a.fitness || 0));
+    const winner = sorted[0];
+
+    // Record generation results
+    tournState.genHistory.push({
+      gen: tournState.generation,
+      lineages: tournState.lineages.map(l => ({
+        id: l.id,
+        fitness: l.fitness,
+        solved: l.agentState.stats.solved,
+        failed: l.agentState.stats.failed,
+        novel: (l.agentState.stats.uniqueConstructs || []).length,
+        evalLines: Math.max(l.agentState.myEvalSource.trim().split('\n').length, Math.ceil(l.agentState.myEvalSource.length / 60)),
+      })),
+      winnerId: winner.id,
+    });
+
+    // Add winner to Hall of Fame
+    tournState.hallOfFame.push({
+      gen: tournState.generation,
+      fitness: winner.fitness,
+      evalSource: winner.agentState.myEvalSource,
+      evalLines: Math.max(winner.agentState.myEvalSource.trim().split('\n').length, Math.ceil(winner.agentState.myEvalSource.length / 60)),
+      novelConstructs: [...(winner.agentState.stats.uniqueConstructs || [])],
+      stats: {...winner.agentState.stats},
+      problemResults: winner.problemResults,
+    });
+
+    tournState.status = `Gen ${tournState.generation} complete! Winner: ${winner.id} (fitness: ${winner.fitness.toFixed(3)})`;
+    tournState.generation++;
+    onUpdate({...tournState});
+
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  tournState.running = false;
+  onUpdate({...tournState});
+}
+
+function classifyExpression(expr) {
+  if (!isPair(expr)) return 'CODE';
+  const head = expr.car;
+  if (!isSym(head)) return 'CODE';
+  const name = head.name;
+  if (name === 'goal') return 'GOAL';
+  if (name === 'sub') return 'SUB';
+  if (name === 'try') return 'TRY';
+  if (name === 'note') return 'NOTE';
+  if (name === 'check') return 'CHECK';
+  if (name === 'done') return 'DONE';
+  if (name === 'show-eval' || name === 'edit-eval!' || name === 'extend-eval!' || name === 'show-env' || name === 'eval-in' || name === 'with-limit') return 'EVAL';
+  if (name === 'defnative!') return 'NATIVE';
+  if (name === 'show-helpers') return 'EVAL';
+  return 'CODE';
+}
+
+function buildPrompt(state, problem, personality) {
+  const cellsLeft = CELL_BUDGET - state.cellsUsed;
+  const stepBudget = state.stepBudget || BASE_STEP_BUDGET;
+  const stepsLeft = stepBudget - state.stepsUsed;
+
+  let scratchpadText = '';
+  for (let i = 0; i < state.scratchpad.length; i++) {
+    const cell = state.scratchpad[i];
+    const costStr = cell.stepCost != null ? ` [+${cell.stepCost} steps]` : '';
+    scratchpadText += `[${i + 1}] ${cell.type} ${cell.exprStr}${costStr}\n`;
+    if (cell.resultStr) scratchpadText += `    => ${cell.resultStr}\n`;
+  }
+
+  const cap = nativeCapForRound(state.round);
+  const nativeSlotsUsed = state.nativeDefsThisRound || 0;
+  const nativeSlotsLeft = Math.max(0, cap - nativeSlotsUsed);
+  const nativeCapStr = cap === Infinity ? 'unlimited' : `${nativeSlotsLeft}/${cap} remaining this round`;
+
+  let prompt = `You are a mind that thinks in Lisp. Output ONLY valid s-expressions. No English. No markdown. No comments.
+
+Every expression you write is interpreted through my-eval, your metacircular evaluator.
+my-eval already handles full Scheme: quote, if, lambda, define (with shorthand), let (with named-let), let*, letrec, begin, cond, and, or, when, unless, set!, for-each, and function application.
+
+Standard Scheme is your FLOOR, not your ceiling. You can USE all these forms freely.
+The question is: what forms does Scheme NOT have that would make YOUR problem-solving more efficient?
+
+STRATEGY — Three ways to extend your capabilities:
+  1. (extend-eval! 'form-name '(handler-body)) — Add a NEW form to my-eval. EASY and REWARDED: +${EVAL_EDIT_BONUS} bonus steps.
+     Example workflow:
+       (define (my-eval-pipe val fns env) (if (null? fns) val (my-eval-pipe (my-apply (my-eval (car fns) env) (list val)) (cdr fns) env)))
+       (extend-eval! '-> '(my-eval-pipe (my-eval (cadr expr) env) (cddr expr) env))
+     Now (-> 5 add1 square) works! The handler body can use expr, env, and head which are in scope.
+  2. (defnative! name (params...) body...) — Native-speed helper. SCARCE: ${nativeCapStr}. Reserve for critical utilities.
+  3. (edit-eval! '(define (my-eval expr env) ...)) — Full eval replacement (advanced).
+
+  Scheme is already built. Now EVOLVE beyond it. Invent forms that don't exist in any standard Lisp:
+  (-> x f g h) pipeline operator, (match expr clauses...) with binding extraction,
+  (tree-walk fn expr) structural recursion, (with-memo fn) automatic memoization,
+  (transform rules expr) rewrite engine, (collect expr for x in lst) comprehensions, etc.
+  These are just examples — invent whatever YOUR problem-solving style needs.
+
+Metacognitive forms (evaluated by the system, not through my-eval):
+  (goal "text")         — declare intent
+  (sub "label" expr)    — labeled computation (body goes through my-eval)
+  (try expr)            — safe eval, returns (#t result) or (#f "error")
+  (note "text")         — record observation
+  (check expected actual) — quote expected if it's a list!
+  (done expr)           — submit answer value
+  (show-eval)           — see my-eval source
+  (extend-eval! 'name '(body)) — add new form to my-eval, grants +${EVAL_EDIT_BONUS} bonus steps
+  (edit-eval! new-def)  — replace entire my-eval, grants +${EVAL_EDIT_BONUS} bonus steps
+  (show-env)            — see current bindings
+  (eval-in expr env)    — sandboxed eval
+  (with-limit n expr)   — bounded eval with n-step sub-budget
+  (defnative! name (params...) body...) — native-speed helper (${nativeCapStr})
+  (show-helpers)        — list persistent helpers
+
+Primitives: +, -, *, /, modulo, <, >, <=, >=, =, eq?, not, cons, car, cdr, cadr, caddr, cadddr, cddr, caar, cdar, list, length, append, map, filter, null?, pair?, number?, boolean?, string?, symbol?, display, error, equal?, abs, min, max, apply, memq, member, assoc
+
+Budget: ${cellsLeft}/${CELL_BUDGET} cells, ${stepsLeft}/${stepBudget} steps | Native slots: ${nativeCapStr}
+`;
+
+  if (state.round > 1) {
+    prompt += `\nBudget tightened to ${stepBudget} steps this round (was ${computeStepBudget(state.round - 1)}). Eval edits grant +${EVAL_EDIT_BONUS} bonus steps — invest in my-eval to stay within budget.\n`;
+  }
+
+  // Show persistent helpers if any
+  if (state.persistentDefs && Object.keys(state.persistentDefs).length > 0) {
+    const helperList = Object.entries(state.persistentDefs).map(([name, def]) =>
+      def.isNative ? `${name} [native]` : name
+    ).join(', ');
+    prompt += `\nYou have these helpers from prior problems: ${helperList}\nUse (show-helpers) to inspect them. They persist across problems.\n`;
+  }
+
+  // Always show my-eval source
+  prompt += `\nCurrent my-eval:\n${state.myEvalSource}\n`;
+
+  // Show evolution stats (Change 6)
+  if (state.stats.uniqueConstructs && state.stats.uniqueConstructs.length > 0) {
+    prompt += `\nNovel constructs you've created: ${state.stats.uniqueConstructs.join(', ')}\n`;
+  }
+  if (state.stats.editsAttempted > 0) {
+    prompt += `Eval edits: ${state.stats.editsAccepted} accepted / ${state.stats.editsAttempted} attempted\n`;
+  }
+  prompt += `Native functions this round: ${nativeSlotsUsed}/${cap === Infinity ? '∞' : cap}\n`;
+
+  // Carry failure note from previous problems
+  if (state.failureNote) {
+    prompt += `\n${state.failureNote}\n`;
+  }
+
+  if (scratchpadText) {
+    prompt += `\nScratchpad:\n${scratchpadText}\n`;
+  }
+
+  const roundLabel = state.round > 1 ? ` (Round ${state.round})` : '';
+  prompt += `\nProblem ${problem.id}${roundLabel}: ${problem.desc}\n`;
+  if (personality) {
+    prompt += `\nEVOLUTIONARY BIAS: ${personality}\n`;
+  }
+
+  prompt += `\nEmit 1-5 s-expressions:`;
+
+  return prompt;
+}
+
+async function callLLM(prompt, apiKey, endpoint, model) {
+  const url = endpoint || 'https://api.anthropic.com/v1/messages';
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: model || 'claude-opus-4-6',
+      max_tokens: 1024,
+      messages: [{role: 'user', content: prompt}],
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`API error ${response.status}: ${err}`);
+  }
+
+  const data = await response.json();
+  return data.content[0].text;
+}
+
+function extractSExpressions(text) {
+  // Parse out up to 5 top-level s-expressions from the LLM response
+  const cleaned = text.replace(/```[\s\S]*?```/g, '').trim();
+  try {
+    const exprs = parseAll(cleaned);
+    return exprs.slice(0, 5);
+  } catch (e) {
+    // Try to salvage partial parse
+    const lines = cleaned.split('\n').filter(l => l.trim());
+    const exprs = [];
+    for (const line of lines) {
+      try {
+        const parsed = parseAll(line.trim());
+        exprs.push(...parsed);
+      } catch (_) {}
+      if (exprs.length >= 5) break;
+    }
+    return exprs.slice(0, 5);
+  }
+}
+
+async function runAgentStep(state, apiKey, endpoint, model, onUpdate, personality) {
+  const problems = state.currentProblems || PROBLEMS;
+  const problem = problems[state.problemIndex];
+  state.status = 'thinking...';
+  onUpdate({...state});
+
+  const prompt = buildPrompt(state, problem, personality);
+  let responseText;
+  try {
+    responseText = await callLLM(prompt, apiKey, endpoint, model);
+  } catch (e) {
+    state.status = 'API error: ' + e.message;
+    onUpdate({...state});
+    return false;
+  }
+
+  const exprs = extractSExpressions(responseText);
+  if (exprs.length === 0) {
+    state.scratchpad.push({type: 'ERR', exprStr: '(no parseable output)', resultStr: responseText.slice(0, 100)});
+    state.cellsUsed++;
+    onUpdate({...state});
+    return true;
+  }
+
+  for (const expr of exprs) {
+    if (state.cellsUsed >= CELL_BUDGET) break;
+
+    const exprStr = lispToString(expr);
+    const type = classifyExpression(expr);
+    const ctx = {
+      steps: state.stepsUsed,
+      stepLimit: state.stepBudget || BASE_STEP_BUDGET,
+      myEvalSource: state.myEvalSource,
+      baseEnv: state.baseEnv,
+      done: false,
+      doneValue: null,
+      persistentDefs: state.persistentDefs,
+      nativeDefsThisRound: state.nativeDefsThisRound || 0,
+      currentRound: state.round,
+    };
+
+    const topHeadName = isPair(expr) && isSym(expr.car) ? expr.car.name : null;
+    const useGroundEval = topHeadName && METACOGNITIVE_FORMS.has(topHeadName);
+
+    const stepsBefore = ctx.steps;
+    let resultStr, isError = false;
+    let cellTypeOverride = null;
+    try {
+      const result = useGroundEval
+        ? evaluate(expr, state.env, ctx)
+        : evaluateViaMyEval(expr, state.env, ctx);
+      resultStr = lispToString(result);
+      state.stepsUsed = ctx.steps;
+      state.myEvalSource = ctx.myEvalSource;
+      state.nativeDefsThisRound = ctx.nativeDefsThisRound;
+
+      // Track edit-eval! and extend-eval! attempts
+      const isEvalEdit = isPair(expr) && isSym(expr.car) &&
+        (expr.car.name === 'edit-eval!' || expr.car.name === 'extend-eval!');
+      if (isEvalEdit) {
+        state.stats.editsAttempted++;
+        if (isPair(result) && result.car === true) {
+          state.stats.editsAccepted++;
+          // Budget bonus for eval edit
+          state.stepBudget += EVAL_EDIT_BONUS;
+          ctx.stepLimit += EVAL_EDIT_BONUS;
+          state.bonusStepsEarned = (state.bonusStepsEarned || 0) + EVAL_EDIT_BONUS;
+          resultStr += ` [+${EVAL_EDIT_BONUS} bonus steps!]`;
+          // Classify the edit
+          const prevSource = state.evalHistory.length > 0
+            ? state.evalHistory[state.evalHistory.length - 1].source
+            : MY_EVAL_SEED;
+          const classification = classifyEvalEdit(state.myEvalSource, prevSource);
+          // Track novel constructs
+          for (const nc of classification.novel) {
+            if (!state.stats.uniqueConstructs.includes(nc)) state.stats.uniqueConstructs.push(nc);
+          }
+          const editType = classification.novel.length > 0 ? 'novel' : (classification.repair.length > 0 ? 'repair' : 'edit');
+          if (classification.novel.length > 0) cellTypeOverride = 'NOVEL';
+          const label = `problem ${state.problemIndex + 1} ${editType}${classification.added.length > 0 ? ': ' + classification.added.join(', ') : ''}`;
+          state.evalHistory.push({
+            problem: problem.id,
+            source: state.myEvalSource,
+            lines: Math.max(state.myEvalSource.trim().split('\n').length, Math.ceil(state.myEvalSource.length / 60)),
+            avgSteps: state.stepsUsed / Math.max(1, state.cellsUsed),
+            label,
+            editType,
+          });
+        }
+      }
+
+      // Track defnative! in stats
+      if (isPair(expr) && isSym(expr.car) && expr.car.name === 'defnative!') {
+        // Only count successful defs (not cap rejections)
+        if (isPair(result) && result.car === true) {
+          state.stats.nativeDefs = (state.stats.nativeDefs || 0) + 1;
+          if (!state.stats.nativeNames) state.stats.nativeNames = [];
+          const nName = isSym(expr.cdr.car) ? expr.cdr.car.name : '?';
+          if (!state.stats.nativeNames.includes(nName)) state.stats.nativeNames.push(nName);
+        }
+      }
+    } catch (e) {
+      resultStr = e.message || String(e);
+      isError = true;
+      state.stepsUsed = ctx.steps;
+    }
+
+    const stepCost = ctx.steps - stepsBefore;
+    state.scratchpad.push({
+      type: isError ? 'ERR' : (cellTypeOverride || type),
+      exprStr: exprStr.length > 200 ? exprStr.slice(0, 200) + '...' : exprStr,
+      resultStr: resultStr.length > 200 ? resultStr.slice(0, 200) + '...' : resultStr,
+      stepCost,
+    });
+    cellTypeOverride = null;
+    state.cellsUsed++;
+
+    if (ctx.done) {
+      // Check if the answer is correct
+      const expectedStr = String(problem.expected);
+      const actualStr = lispToString(ctx.doneValue);
+      if (actualStr === expectedStr || lispToString(ctx.doneValue) === expectedStr) {
+        state.stats.solved++;
+        state.status = `Problem ${problem.id} solved!`;
+      } else {
+        state.stats.failed++;
+        state.status = `Problem ${problem.id}: wrong answer (got ${actualStr}, expected ${expectedStr})`;
+      }
+      onUpdate({...state});
+      return 'next';
+    }
+
+    onUpdate({...state});
+  }
+
+  if (state.cellsUsed >= CELL_BUDGET || state.stepsUsed >= (state.stepBudget || BASE_STEP_BUDGET)) {
+    state.stats.failed++;
+    state.status = `Problem ${problem.id} failed: budget exhausted`;
+    const cap = nativeCapForRound(state.round);
+    const slotsExhausted = (state.nativeDefsThisRound || 0) >= cap;
+    state.failureNote = slotsExhausted
+      ? `NOTE: Problem ${problem.id} failed — budget exhausted AND native slots are full (${cap}/${cap}). Use (extend-eval! 'form-name '(body)) to add forms that reduce overhead for ALL future code.`
+      : `NOTE: Problem ${problem.id} failed due to budget exhaustion (${state.stepsUsed} steps used). Consider using (extend-eval! 'form-name '(body)) to add forms to my-eval — each successful edit grants +${EVAL_EDIT_BONUS} bonus steps.`;
+    onUpdate({...state});
+    return 'next';
+  }
+
+  return true;
+}
+
+async function runProblem(state, apiKey, endpoint, model, onUpdate, shouldContinue, personality) {
+  state.cellsUsed = 0;
+  state.stepsUsed = 0;
+  state.scratchpad = [];
+
+  // Re-init env for each problem but keep my-eval modifications
+  initEnv(state);
+  // Re-install the current my-eval
+  if (state.myEvalSource !== MY_EVAL_SEED) {
+    const exprs = parseAll(state.myEvalSource);
+    const ctx = {steps: 0, stepLimit: 2000, baseEnv: state.baseEnv, myEvalSource: state.myEvalSource};
+    for (const e of exprs) evaluate(e, state.env, ctx);
+  }
+
+  // Replay persistent definitions into the fresh env
+  replayPersistentDefs(state);
+
+  const problems = state.currentProblems || PROBLEMS;
+  const problem = problems[state.problemIndex];
+  state.status = `Solving problem ${problem.id}: ${problem.name}`;
+  onUpdate({...state});
+
+  while (shouldContinue()) {
+    const result = await runAgentStep(state, apiKey, endpoint, model, onUpdate, personality);
+    if (result === 'next') {
+      // Store problem history
+      const solved = state.status.includes('solved');
+      state.problemHistory.push({
+        problemId: problem.id,
+        name: problem.name,
+        scratchpad: [...state.scratchpad],
+        solved,
+        cellsUsed: state.cellsUsed,
+        stepsUsed: state.stepsUsed,
+        round: state.round,
+      });
+      // Save persistent defs on success
+      if (solved) {
+        savePersistentDefs(state);
+        state.failureNote = null;
+      }
+      return;
+    }
+    if (result === false) {
+      // API error — retry with exponential backoff (up to 3 retries)
+      state._apiRetries = (state._apiRetries || 0) + 1;
+      if (state._apiRetries >= 3) {
+        state.stats.failed++;
+        state.status = `Problem ${problem.id} failed: API error after 3 retries`;
+        state.problemHistory.push({
+          problemId: problem.id, name: problem.name,
+          scratchpad: [...state.scratchpad], solved: false,
+          cellsUsed: state.cellsUsed, stepsUsed: state.stepsUsed, round: state.round,
+        });
+        state._apiRetries = 0;
+        return;
+      }
+      const delay = 500 * Math.pow(2, state._apiRetries); // 1s, 2s, 4s
+      state.status = `API error — retrying in ${delay/1000}s (attempt ${state._apiRetries}/3)...`;
+      onUpdate({...state});
+      await new Promise(r => setTimeout(r, delay));
+      continue;
+    }
+    state._apiRetries = 0;
+    // Small delay between steps
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
+
+function savePersistentDefs(state) {
+  // Scan agent env for user-defined symbols (not in baseEnv)
+  const agentBindings = state.env.bindings;
+  const baseNames = new Set();
+  let e = state.baseEnv;
+  while (e) { for (const k of e.bindings.keys()) baseNames.add(k); e = e.parent; }
+  // Also exclude my-eval infrastructure
+  const excludeNames = new Set(['my-eval', 'env-lookup', 'env-define!', 'make-closure',
+    'my-apply', 'my-eval-let', 'my-eval-let-binds', 'my-eval-seq', 'cdddr']);
+
+  for (const [name, val] of agentBindings) {
+    if (baseNames.has(name) || excludeNames.has(name)) continue;
+    if (typeof val === 'function' && val._isNative) {
+      // Native function — persist with metadata
+      state.persistentDefs[name] = {isNative: true, nativeFn: val, sourceParams: val._sourceParams, sourceBody: val._sourceBody};
+    } else if (isClosure(val)) {
+      // Lisp closure — persist as source
+      const paramStr = val.params.join(' ');
+      const bodyStr = val.body.map(b => lispToString(b)).join(' ');
+      state.persistentDefs[name] = {isNative: false, expr: `(define (${name} ${paramStr}) ${bodyStr})`};
+    }
+  }
+}
+
+function replayPersistentDefs(state) {
+  if (!state.persistentDefs || Object.keys(state.persistentDefs).length === 0) return;
+  const ctx = {steps: 0, stepLimit: 3000, baseEnv: state.baseEnv, myEvalSource: state.myEvalSource};
+  let replayed = 0;
+  for (const [name, def] of Object.entries(state.persistentDefs)) {
+    try {
+      if (def.isNative && def.nativeFn) {
+        envDefine(state.env, name, def.nativeFn);
+        replayed++;
+      } else if (def.expr) {
+        const exprs = parseAll(def.expr);
+        for (const e of exprs) evaluate(e, state.env, ctx);
+        replayed++;
+      }
+    } catch (e) {
+      console.warn(`Failed to replay persistent def '${name}':`, e.message);
+    }
+  }
+  state.stats.helperReuses = (state.stats.helperReuses || 0) + replayed;
+}
+
+function buildReflectionPrompt(state) {
+  const problems = state.currentProblems || PROBLEMS;
+  const roundHistory = state.problemHistory.filter(h => h.round === state.round);
+  const solved = roundHistory.filter(h => h.solved).length;
+  const failed = roundHistory.filter(h => !h.solved).length;
+  const totalSteps = roundHistory.reduce((s, h) => s + h.stepsUsed, 0);
+
+  let perProblem = '';
+  for (const h of roundHistory) {
+    perProblem += `  ${h.name}: ${h.solved ? 'solved' : 'FAILED'} (${h.stepsUsed} steps, ${h.cellsUsed} cells)\n`;
+  }
+
+  const helperList = Object.entries(state.persistentDefs || {}).map(([name, def]) =>
+    `  ${name}${def.isNative ? ' [native]' : ''}`
+  ).join('\n') || '  (none)';
+
+  const nextBudget = computeStepBudget(state.round + 1);
+  const nextCap = nativeCapForRound(state.round + 1);
+  const novelConstructs = (state.stats.uniqueConstructs || []).map(n => n.replace(/\)+$/, ''));
+
+  return `You are a mind that thinks in Lisp. Output ONLY valid s-expressions. No English. No markdown. No comments.
+
+REFLECTION PHASE — Round ${state.round} complete. Prepare for Round ${state.round + 1}.
+
+Round ${state.round} summary:
+  Solved: ${solved}/${solved + failed}
+  Total steps used: ${totalSteps}
+  Per-problem breakdown:
+${perProblem}
+Current my-eval:
+${state.myEvalSource}
+
+Persistent helpers:
+${helperList}
+${novelConstructs.length > 0 ? `\nNovel constructs created so far: ${novelConstructs.join(', ')}` : ''}
+Eval edits: ${state.stats.editsAccepted} accepted / ${state.stats.editsAttempted} attempted
+
+STRATEGIC NOTES FOR NEXT ROUND:
+  Budget: ${nextBudget} steps (tighter than current ${state.stepBudget || BASE_STEP_BUDGET})
+  Native cap: ${nextCap} defnative! slots per round (scarce — choose wisely)
+  Eval edit bonus: +${EVAL_EDIT_BONUS} steps per successful extend-eval!/edit-eval! (+${Math.floor(EVAL_EDIT_BONUS / 2)} during reflection)
+  ${state.round >= 2 ? 'Evolution problems (symbolic differentiation, tree transforms, etc.) will increase next round.' : 'Hard and evolution problems (symbolic manipulation, tree transforms) will be mixed in.'}
+
+  Scheme is already your baseline. Standard forms earn nothing new. EVOLVE BEYOND SCHEME.
+  USE extend-eval! to add new forms. It's simple — two steps:
+    1. Define a helper: (define (my-eval-pipe val fns env) ...)
+    2. Register it: (extend-eval! '-> '(my-eval-pipe (my-eval (cadr expr) env) (cddr expr) env))
+  Now (-> x f g) is a first-class form in your language!
+
+  Ideas: (-> x f g h) pipelines, (tree-walk fn expr) structural recursion, (with-memo fn) memoization,
+  (transform rules expr) rewrite engine, (collect expr for x in lst) comprehensions,
+  (match expr (pattern body)...) pattern matching, (destruct (a b . rest) lst body) destructuring.
+  What patterns keep recurring in your solutions? Make them first-class in your language.
+
+Metacognitive forms available:
+  (extend-eval! 'name '(body)) — add new form to my-eval, grants +${Math.floor(EVAL_EDIT_BONUS / 2)} bonus steps. Body can use expr, env, head.
+  (edit-eval! '(define (my-eval expr env) ...)) — full eval replacement (advanced)
+  (defnative! name (params...) body...) — native-speed helper (${nextCap} slots next round)
+  (note "text") — record observations
+  (show-eval) — inspect my-eval source
+  (show-helpers) — list persistent helpers
+
+Budget for reflection: 500 steps, ${CELL_BUDGET} cells.
+Emit 1-5 s-expressions:`;
+}
+
+async function runReflection(state, apiKey, endpoint, model, onUpdate, shouldContinue) {
+  state.status = `Reflection phase (Round ${state.round})...`;
+  state.cellsUsed = 0;
+  state.stepsUsed = 0;
+  state.scratchpad = [];
+
+  // Init a fresh env with current my-eval and persistent defs
+  initEnv(state);
+  if (state.myEvalSource !== MY_EVAL_SEED) {
+    const exprs = parseAll(state.myEvalSource);
+    const ctx = {steps: 0, stepLimit: 2000, baseEnv: state.baseEnv, myEvalSource: state.myEvalSource};
+    for (const e of exprs) evaluate(e, state.env, ctx);
+  }
+  replayPersistentDefs(state);
+
+  onUpdate({...state});
+
+  const REFLECT_STEP_BUDGET = 500;
+  let turnsLeft = 5; // max 5 LLM calls during reflection
+
+  while (shouldContinue() && turnsLeft > 0 && state.cellsUsed < CELL_BUDGET && state.stepsUsed < REFLECT_STEP_BUDGET) {
+    turnsLeft--;
+    const prompt = buildReflectionPrompt(state);
+    let responseText;
+    try {
+      responseText = await callLLM(prompt, apiKey, endpoint, model);
+    } catch (e) {
+      state.status = 'Reflection API error: ' + e.message;
+      onUpdate({...state});
+      return;
+    }
+
+    const exprs = extractSExpressions(responseText);
+    if (exprs.length === 0) break;
+
+    for (const expr of exprs) {
+      if (state.cellsUsed >= CELL_BUDGET || state.stepsUsed >= REFLECT_STEP_BUDGET) break;
+
+      const exprStr = lispToString(expr);
+      const type = classifyExpression(expr);
+      const ctx = {
+        steps: state.stepsUsed,
+        stepLimit: REFLECT_STEP_BUDGET,
+        myEvalSource: state.myEvalSource,
+        baseEnv: state.baseEnv,
+        done: false,
+        doneValue: null,
+        persistentDefs: state.persistentDefs,
+        nativeDefsThisRound: state.nativeDefsThisRound || 0,
+        currentRound: state.round,
+      };
+
+      const topHeadName = isPair(expr) && isSym(expr.car) ? expr.car.name : null;
+      const useGroundEval = topHeadName && METACOGNITIVE_FORMS.has(topHeadName);
+
+      const stepsBefore = ctx.steps;
+      let resultStr, isError = false;
+      let cellTypeOverride = null;
+      try {
+        const result = useGroundEval
+          ? evaluate(expr, state.env, ctx)
+          : evaluateViaMyEval(expr, state.env, ctx);
+        resultStr = lispToString(result);
+        state.stepsUsed = ctx.steps;
+        state.myEvalSource = ctx.myEvalSource;
+        state.nativeDefsThisRound = ctx.nativeDefsThisRound;
+
+        // Track edit-eval! and extend-eval! during reflection
+        const isReflEvalEdit = isPair(expr) && isSym(expr.car) &&
+          (expr.car.name === 'edit-eval!' || expr.car.name === 'extend-eval!');
+        if (isReflEvalEdit) {
+          state.stats.editsAttempted++;
+          if (isPair(result) && result.car === true) {
+            state.stats.editsAccepted++;
+            // Smaller bonus during reflection
+            const reflectionBonus = Math.floor(EVAL_EDIT_BONUS / 2);
+            state.bonusStepsEarned = (state.bonusStepsEarned || 0) + reflectionBonus;
+            resultStr += ` [+${reflectionBonus} bonus steps!]`;
+            const prevSource = state.evalHistory.length > 0
+              ? state.evalHistory[state.evalHistory.length - 1].source : MY_EVAL_SEED;
+            const classification = classifyEvalEdit(state.myEvalSource, prevSource);
+            for (const nc of classification.novel) {
+              if (!state.stats.uniqueConstructs.includes(nc)) state.stats.uniqueConstructs.push(nc);
+            }
+            const editType = classification.novel.length > 0 ? 'novel' : (classification.repair.length > 0 ? 'repair' : 'edit');
+            if (classification.novel.length > 0) cellTypeOverride = 'NOVEL';
+            state.evalHistory.push({
+              problem: 0,
+              source: state.myEvalSource,
+              lines: Math.max(state.myEvalSource.trim().split('\n').length, Math.ceil(state.myEvalSource.length / 60)),
+              avgSteps: 0,
+              label: `reflection R${state.round} ${editType}${classification.added.length > 0 ? ': ' + classification.added.join(', ') : ''}`,
+              editType,
+            });
+          }
+        }
+
+        // Track defnative! during reflection
+        if (isPair(expr) && isSym(expr.car) && expr.car.name === 'defnative!') {
+          if (isPair(result) && result.car === true) {
+            state.stats.nativeDefs = (state.stats.nativeDefs || 0) + 1;
+            if (!state.stats.nativeNames) state.stats.nativeNames = [];
+            const nName = isSym(expr.cdr.car) ? expr.cdr.car.name : '?';
+            if (!state.stats.nativeNames.includes(nName)) state.stats.nativeNames.push(nName);
+          }
+        }
+      } catch (e) {
+        resultStr = e.message || String(e);
+        isError = true;
+        state.stepsUsed = ctx.steps;
+      }
+
+      const stepCost = ctx.steps - stepsBefore;
+      state.scratchpad.push({
+        type: isError ? 'ERR' : (cellTypeOverride || (type === 'CODE' ? 'REFLECT' : type)),
+        exprStr: exprStr.length > 200 ? exprStr.slice(0, 200) + '...' : exprStr,
+        resultStr: resultStr.length > 200 ? resultStr.slice(0, 200) + '...' : resultStr,
+        stepCost,
+      });
+      state.cellsUsed++;
+      onUpdate({...state});
+    }
+
+    // If agent used (done), stop reflection early
+    if (state.scratchpad.some(c => c.type === 'DONE')) break;
+
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  // Save any defs created during reflection
+  savePersistentDefs(state);
+
+  // Store reflection in problem history
+  state.problemHistory.push({
+    problemId: 0,
+    name: `Reflection R${state.round}`,
+    scratchpad: [...state.scratchpad],
+    solved: true,
+    cellsUsed: state.cellsUsed,
+    stepsUsed: state.stepsUsed,
+    round: state.round,
+    isReflection: true,
+  });
+
+  state.reflectionDone = true;
+  state.status = `Reflection complete (Round ${state.round})`;
+  onUpdate({...state});
+}
+
+async function runAllProblems(state, apiKey, endpoint, model, onUpdate, shouldContinue, personality) {
+  state.running = true;
+  // Only init env on fresh start (not continue)
+  if (state.problemIndex === 0 && state.round === 1) {
+    initEnv(state);
+  }
+  // Set current problems if not already set
+  if (!state.currentProblems) state.currentProblems = PROBLEMS;
+  onUpdate({...state});
+
+  const problems = state.currentProblems;
+  while (state.problemIndex < problems.length && shouldContinue()) {
+    await runProblem(state, apiKey, endpoint, model, onUpdate, shouldContinue, personality);
+    state.problemIndex++;
+    if (state.problemIndex < problems.length) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
+  // Run reflection phase after all problems complete
+  if (state.problemIndex >= problems.length && !state.reflectionDone && shouldContinue()) {
+    await runReflection(state, apiKey, endpoint, model, onUpdate, shouldContinue);
+  }
+
+  state.running = false;
+  const roundLabel = state.round > 1 ? ` (Round ${state.round})` : '';
+  state.status = state.problemIndex >= problems.length ? `All problems complete!${roundLabel}` : 'Paused';
+  onUpdate({...state});
+}
+
+// ============================================================
+// REACT UI
+// ============================================================
+
+const {createElement: h, useState, useRef, useCallback, useEffect} = React;
+
+function Badge({type}) {
+  return h('span', {className: `cell-badge badge-${type}`}, type);
+}
+
+function BudgetBar({label, used, total, className}) {
+  const pct = Math.min(100, (used / total) * 100);
+  const fillClass = pct > 80 ? 'danger' : pct > 60 ? 'warn' : className;
+  return h('div', {className: 'budget-item'}, [
+    h('div', {className: 'budget-label', key: 'l'}, [
+      h('span', {key: 'n'}, label),
+      h('span', {key: 'v'}, `${used}/${total}`),
+    ]),
+    h('div', {className: 'budget-track', key: 't'},
+      h('div', {className: `budget-fill ${fillClass}`, style: {width: pct + '%'}})
+    ),
+  ]);
+}
+
+function ScratchpadPanel({cells, viewingHistory}) {
+  const scrollRef = useRef(null);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [cells.length]);
+
+  const headerText = viewingHistory
+    ? `Scratchpad — Problem ${viewingHistory.problemId}: ${viewingHistory.name}${viewingHistory.round > 1 ? ' (R' + viewingHistory.round + ')' : ''}`
+    : 'Scratchpad';
+
+  return h('div', {className: `panel ${viewingHistory ? 'history-overlay' : ''}`}, [
+    h('div', {className: 'panel-header', key: 'h'}, headerText),
+    viewingHistory ? h('span', {className: 'history-label-tag', key: 'tag'},
+      viewingHistory.solved ? `Solved in ${viewingHistory.stepsUsed} steps` : 'Failed'
+    ) : null,
+    h('div', {className: 'panel-body scratchpad-scroll', key: 'b', ref: scrollRef,
+      style: viewingHistory ? {opacity: 0.8} : {}},
+      cells.length === 0
+        ? h('div', {style: {color: 'var(--dim)', padding: '16px', textAlign: 'center'}}, 'Waiting for agent...')
+        : cells.map((cell, i) =>
+          h('div', {className: 'scratchpad-cell', key: i}, [
+            h('span', {className: 'cell-num', key: 'n'}, i + 1),
+            h(Badge, {type: cell.type, key: 'b'}),
+            h('div', {key: 'c', style: {flex: 1}}, [
+              h('div', {className: 'cell-expr', key: 'e'}, cell.exprStr),
+              cell.resultStr ? h('div', {className: 'cell-result', key: 'r'}, '=> ' + cell.resultStr) : null,
+            ]),
+            cell.stepCost != null ? h('span', {className: 'cell-stepcost', key: 'sc'}, `+${cell.stepCost}`) : null,
+          ])
+        )
+    ),
+  ]);
+}
+
+function ProblemBadges({problemHistory, currentIndex, viewingIndex, onSelect, round, problems}) {
+  const probs = problems || PROBLEMS;
+  return h('div', {className: 'problem-badges'}, [
+    ...probs.map((p, i) => {
+      // Find the most recent history entry for this problem
+      const histEntries = problemHistory.filter(h => h.problemId === p.id);
+      const hist = histEntries.length > 0 ? histEntries[histEntries.length - 1] : null;
+      const isActive = i === currentIndex;
+      const isFuture = !hist && i > currentIndex;
+      const isViewing = i === viewingIndex;
+      let cls = 'problem-badge';
+      if (isActive) cls += ' active';
+      else if (hist && hist.solved) cls += ' solved';
+      else if (hist && !hist.solved) cls += ' failed';
+      else if (isFuture) cls += ' future';
+      if (isViewing) cls += ' viewing';
+      return h('div', {
+        className: cls,
+        key: p.id,
+        onClick: () => !isFuture && onSelect(i),
+        title: `#${p.id} ${p.name}${hist ? (hist.solved ? ' (solved)' : ' (failed)') : ''}`,
+      }, i + 1);
+    }),
+    round > 1 ? h('span', {className: 'badge-round', key: 'round'}, `Round ${round}`) : null,
+  ]);
+}
+
+function EvalSourcePanel({source, collapsed, onToggle}) {
+  return h('div', {className: 'panel'}, [
+    h('div', {className: 'panel-header', key: 'h', onClick: onToggle}, [
+      h('span', {key: 't'}, 'EVAL SOURCE'),
+      h('span', {key: 'i'}, collapsed ? '+' : '-'),
+    ]),
+    h('div', {className: `panel-body ${collapsed ? 'collapsed' : ''}`, key: 'b'},
+      h('pre', {className: 'eval-source'}, source.trim())
+    ),
+  ]);
+}
+
+function EvalHistoryPanel({history}) {
+  return h('div', {className: 'panel'}, [
+    h('div', {className: 'panel-header', key: 'h'}, 'EVAL HISTORY'),
+    h('div', {className: 'panel-body', key: 'b'},
+      history.map((entry, i) =>
+        h('div', {className: 'history-item', key: i}, [
+          h('div', {className: 'history-label', key: 'l'}, entry.label),
+          h('div', {className: 'history-detail', key: 'd'},
+            `${entry.lines} lines | ~${Math.round(entry.avgSteps)} steps/cell`
+          ),
+        ])
+      )
+    ),
+  ]);
+}
+
+function EvolutionPanel({stats, persistentDefs, evalHistory}) {
+  const nativeNames = stats.nativeNames || [];
+  const novelConstructs = (stats.uniqueConstructs || []).map(n => n.replace(/\)+$/, ''));
+  const numPersistent = Object.keys(persistentDefs || {}).length;
+  const repairEdits = evalHistory.filter(e => e.editType === 'repair').length;
+  const novelEdits = evalHistory.filter(e => e.editType === 'novel').length;
+  const totalProbs = stats.solved + stats.failed;
+  const reuseRate = totalProbs > 0 && numPersistent > 0
+    ? Math.round((stats.helperReuses / (totalProbs * numPersistent)) * 100) : 0;
+
+  return h('div', {className: 'panel evolution-panel'}, [
+    h('div', {className: 'panel-header', key: 'h'}, 'EVOLUTION'),
+    h('div', {className: 'panel-body', key: 'b'}, [
+      h('div', {className: 'evolution-item', key: 'nat'}, [
+        h('span', {key: 'l'}, 'Native functions'),
+        h('span', {className: 'evolution-val', key: 'v'}, stats.nativeDefs || 0),
+      ]),
+      nativeNames.length > 0 ? h('div', {className: 'evolution-list', key: 'natl'}, nativeNames.join(', ')) : null,
+      h('div', {className: 'evolution-item', key: 'edits'}, [
+        h('span', {key: 'l'}, 'Eval edits (repair / novel)'),
+        h('span', {className: 'evolution-val', key: 'v'}, `${repairEdits} / ${novelEdits}`),
+      ]),
+      h('div', {className: 'evolution-item', key: 'helpers'}, [
+        h('span', {key: 'l'}, 'Persistent helpers'),
+        h('span', {className: 'evolution-val', key: 'v'}, numPersistent),
+      ]),
+      h('div', {className: 'evolution-item', key: 'reuse'}, [
+        h('span', {key: 'l'}, 'Helper reuse rate'),
+        h('span', {className: 'evolution-val', key: 'v'}, `${reuseRate}%`),
+      ]),
+      h('div', {className: 'evolution-item', key: 'novel'}, [
+        h('span', {key: 'l'}, 'Novel constructs'),
+        h('span', {className: 'evolution-val', key: 'v'}, novelConstructs.length),
+      ]),
+      novelConstructs.length > 0 ? h('div', {className: 'evolution-list', key: 'novl'}, novelConstructs.join(', ')) : null,
+    ]),
+  ]);
+}
+
+function StatsBar({stats, evalSource, round, onExport, onImport, bonusStepsEarned, nativeDefsThisRound}) {
+  const lines = Math.max(evalSource.trim().split('\n').length, Math.ceil(evalSource.length / 60));
+  const cap = nativeCapForRound(round);
+  const capStr = cap === Infinity ? '' : `/${cap}`;
+  return h('div', {className: 'stats-bar'}, [
+    h('div', {className: 'stat', key: 's'}, [h('span', {key: 'l'}, 'Solved:'), h('span', {className: 'stat-val', key: 'v'}, stats.solved)]),
+    h('div', {className: 'stat', key: 'f'}, [h('span', {key: 'l'}, 'Failed:'), h('span', {className: 'stat-val', key: 'v'}, stats.failed)]),
+    h('div', {className: 'stat', key: 'ea'}, [h('span', {key: 'l'}, 'Edits:'), h('span', {className: 'stat-val', key: 'v'}, `${stats.editsAccepted}/${stats.editsAttempted}`)]),
+    h('div', {className: 'stat', key: 'el'}, [h('span', {key: 'l'}, 'Eval:'), h('span', {className: 'stat-val', key: 'v'}, `~${lines}L`)]),
+    h('div', {className: 'stat', key: 'nat'}, [h('span', {key: 'l'}, 'Native:'), h('span', {className: 'stat-val', key: 'v'}, `${nativeDefsThisRound || 0}${capStr}`)]),
+    bonusStepsEarned > 0 ? h('div', {className: 'stat', key: 'bonus'}, [h('span', {key: 'l'}, 'Bonus:'), h('span', {className: 'stat-val', style: {color: '#ffd700'}, key: 'v'}, `+${bonusStepsEarned}`)]) : null,
+    round > 1 ? h('div', {className: 'stat', key: 'rnd'}, [h('span', {key: 'l'}, 'R'), h('span', {className: 'stat-val', key: 'v'}, round)]) : null,
+    h('div', {className: 'save-controls', key: 'save'}, [
+      h('button', {className: 'btn btn-export', key: 'exp', onClick: onExport}, 'Export'),
+      h('button', {className: 'btn btn-import', key: 'imp', onClick: onImport}, 'Import'),
+    ]),
+  ]);
+}
+
+// ============================================================
+// TOURNAMENT UI COMPONENTS
+// ============================================================
+
+function ModeToggle({mode, onSetMode, disabled}) {
+  return h('div', {className: 'mode-toggle'}, [
+    h('button', {key: 's', className: `mode-btn${mode === 'single' ? ' active' : ''}`,
+      onClick: () => onSetMode('single'), disabled}, 'Single Lineage'),
+    h('button', {key: 't', className: `mode-btn${mode === 'tournament' ? ' active' : ''}`,
+      onClick: () => onSetMode('tournament'), disabled}, 'Tournament'),
+  ]);
+}
+
+function TournamentConfig({tournState, onUpdate, disabled}) {
+  return h('div', {className: 'tournament-config'}, [
+    h('div', {className: 'config-field', key: 'l'}, [
+      h('span', {key: 'label'}, 'Lineages:'),
+      h('input', {key: 'input', className: 'config-input', type: 'number', min: 2, max: 8,
+        value: tournState.lineagesPerGen, disabled,
+        onChange: (e) => { const v = Math.max(2, Math.min(8, parseInt(e.target.value) || 4)); onUpdate({...tournState, lineagesPerGen: v}); }}),
+    ]),
+    h('div', {className: 'config-field', key: 'r'}, [
+      h('span', {key: 'label'}, 'Rounds/lineage:'),
+      h('input', {key: 'input', className: 'config-input', type: 'number', min: 1, max: 5,
+        value: tournState.roundsPerLineage, disabled,
+        onChange: (e) => { const v = Math.max(1, Math.min(5, parseInt(e.target.value) || 3)); onUpdate({...tournState, roundsPerLineage: v}); }}),
+    ]),
+    h('div', {className: 'config-field', key: 'info', style: {color: 'var(--dim)', fontSize: '11px'}},
+      `${tournState.lineagesPerGen * tournState.roundsPerLineage * 15} problems/gen`),
+  ]);
+}
+
+function LineageCard({lineage, index, isActive, isWinner, totalRounds}) {
+  const s = lineage.agentState;
+  const total = s.stats.solved + s.stats.failed;
+  const progress = totalRounds > 0 ? Math.min(1, (s.round - 1 + (total > 0 ? s.problemIndex / (s.currentProblems || []).length : 0)) / totalRounds) : 0;
+  const classes = ['lineage-card', isActive && 'active', isWinner && 'winner'].filter(Boolean).join(' ');
+  // Extract short personality label from the personality string (e.g. "RECURSION", "PATTERN MATCHING")
+  const personalityLabel = lineage.personality ? (lineage.personality.match(/\b([A-Z][A-Z\s]+[A-Z])\b/) || [])[1] || '' : '';
+
+  return h('div', {className: classes}, [
+    h('div', {className: 'lineage-header', key: 'h'}, [
+      h('span', {className: 'lineage-id', key: 'id'}, [`#${lineage.id}`, personalityLabel ? h('span', {key: 'p', style: {color: 'var(--dim)', fontSize: '10px', marginLeft: '6px', fontWeight: 400}}, personalityLabel) : null]),
+      lineage.fitness !== null
+        ? h('span', {className: 'lineage-fitness', key: 'f'}, lineage.fitness.toFixed(3))
+        : h('span', {className: 'lineage-fitness', key: 'f', style: {color: 'var(--dim)', fontSize: '11px'}}, isActive ? 'running...' : 'pending'),
+    ]),
+    h('div', {className: 'lineage-stats', key: 's'}, [
+      h('div', {key: 'solved'}, ['Solved: ', h('span', {className: 'lineage-stat-val', key: 'v'}, s.stats.solved)]),
+      h('div', {key: 'failed'}, ['Failed: ', h('span', {className: 'lineage-stat-val', key: 'v'}, s.stats.failed)]),
+      h('div', {key: 'novel'}, ['Novel: ', h('span', {className: 'lineage-stat-val', key: 'v'}, (s.stats.uniqueConstructs || []).length)]),
+      h('div', {key: 'eval'}, ['Eval: ', h('span', {className: 'lineage-stat-val', key: 'v'},
+        `${Math.max(s.myEvalSource.trim().split('\n').length, Math.ceil(s.myEvalSource.length / 60))}L`)]),
+      h('div', {key: 'round'}, ['Round: ', h('span', {className: 'lineage-stat-val', key: 'v'}, `${s.round}/${totalRounds}`)]),
+    ]),
+    h('div', {className: 'lineage-progress', key: 'p'},
+      h('div', {className: 'lineage-progress-fill', style: {width: `${(progress * 100).toFixed(0)}%`}})),
+  ]);
+}
+
+function LineagesGrid({lineages, currentIdx, winnerId, totalRounds}) {
+  if (lineages.length === 0) return null;
+  return h('div', {className: 'lineages-grid'},
+    lineages.map((l, i) => h(LineageCard, {
+      key: l.id, lineage: l, index: i,
+      isActive: i === currentIdx && l.fitness === null,
+      isWinner: l.id === winnerId,
+      totalRounds,
+    }))
+  );
+}
+
+function GenerationTimeline({genHistory, hallOfFame, selectedGen, onSelectGen}) {
+  if (genHistory.length === 0) return null;
+  return h('div', {className: 'gen-timeline'},
+    genHistory.map((g) => {
+      const hof = hallOfFame.find(h => h.gen === g.gen);
+      return h('div', {
+        key: g.gen,
+        className: `gen-badge${selectedGen === g.gen ? ' active' : ''}`,
+        onClick: () => onSelectGen(g.gen),
+      }, [
+        h('span', {className: 'gen-num', key: 'n'}, `Gen ${g.gen}`),
+        hof ? h('span', {className: 'gen-fitness', key: 'f'}, hof.fitness.toFixed(3)) : null,
+      ]);
+    })
+  );
+}
+
+function HallOfFame({hallOfFame}) {
+  if (hallOfFame.length === 0) return null;
+  return h('div', {className: 'hall-of-fame'}, [
+    h('div', {className: 'hof-title', key: 'title'}, 'Hall of Fame'),
+    ...hallOfFame.map((entry, i) =>
+      h('div', {className: 'hof-entry', key: i}, [
+        h('span', {className: 'hof-gen', key: 'g'}, `Gen ${entry.gen}`),
+        h('span', {className: 'hof-fitness', key: 'f'}, entry.fitness.toFixed(3)),
+        h('span', {className: 'hof-details', key: 'd'},
+          `${entry.stats.solved} solved | ${entry.novelConstructs.length} novel | ${entry.evalLines}L`),
+      ])
+    ),
+  ]);
+}
+
+function TournamentView({tournState, onUpdate, apiKey, endpoint, model, tournRef}) {
+  const activeLineage = tournState.lineages[tournState.currentLineageIdx];
+  const lastGenHistory = tournState.genHistory.length > 0 ? tournState.genHistory[tournState.genHistory.length - 1] : null;
+  const winnerId = lastGenHistory && !tournState.running ? lastGenHistory.winnerId : null;
+  const [selectedGen, setSelectedGen] = useState(null);
+
+  // Show selected generation's lineages, or current ones
+  let displayLineages = tournState.lineages;
+  let displayWinnerId = winnerId;
+  if (selectedGen !== null) {
+    const gh = tournState.genHistory.find(g => g.gen === selectedGen);
+    if (gh) {
+      displayWinnerId = gh.winnerId;
+    }
+  }
+
+  return h('div', null, [
+    h(TournamentConfig, {key: 'config', tournState, onUpdate, disabled: tournState.running}),
+
+    // Controls
+    h('div', {className: 'controls', key: 'ctrl'}, [
+      h('button', {className: 'btn', key: 'start', disabled: tournState.running || !apiKey,
+        onClick: () => {
+          tournRef.current = true;
+          runTournament(tournState, apiKey, endpoint, model, onUpdate, () => tournRef.current);
+        }}, 'Start Tournament'),
+      h('button', {className: 'btn btn-secondary', key: 'pause', disabled: !tournState.running,
+        onClick: () => { tournRef.current = false; }}, 'Pause'),
+      h('button', {className: 'btn btn-secondary', key: 'reset', disabled: tournState.running,
+        onClick: () => { tournRef.current = false; onUpdate(createTournamentState()); }}, 'Reset'),
+      h('span', {className: 'status-msg', key: 'status'}, tournState.status),
+    ]),
+
+    // Generation timeline
+    h(GenerationTimeline, {key: 'timeline', genHistory: tournState.genHistory, hallOfFame: tournState.hallOfFame,
+      selectedGen, onSelectGen: (g) => setSelectedGen(selectedGen === g ? null : g)}),
+
+    // Tournament status bar
+    tournState.running || tournState.lineages.length > 0
+      ? h('div', {className: 'tournament-status', key: 'tstatus'}, [
+          h('div', {className: 'label', key: 'l'}, `Generation ${tournState.generation > 1 || tournState.hallOfFame.length > 0 ? tournState.generation - (tournState.running ? 0 : 1) : 1}`),
+          h('div', {key: 'v'}, tournState.status),
+        ])
+      : null,
+
+    // Lineage cards grid
+    h(LineagesGrid, {key: 'grid', lineages: displayLineages, currentIdx: tournState.currentLineageIdx,
+      winnerId: displayWinnerId, totalRounds: tournState.roundsPerLineage}),
+
+    // Active lineage detail: scratchpad + eval source
+    activeLineage ? h('div', {className: 'main-grid', key: 'detail'}, [
+      h(ScratchpadPanel, {key: 'sp', cells: activeLineage.agentState.scratchpad, viewingHistory: null}),
+      h('div', {key: 'right'}, [
+        h(EvalSourcePanel, {key: 'es', source: activeLineage.agentState.myEvalSource, collapsed: false, onToggle: () => {}}),
+        h('div', {style: {height: '12px'}, key: 'gap'}),
+        h(EvolutionPanel, {key: 'ev', stats: activeLineage.agentState.stats,
+          persistentDefs: activeLineage.agentState.persistentDefs, evalHistory: activeLineage.agentState.evalHistory}),
+      ]),
+    ]) : null,
+
+    // Hall of Fame
+    h(HallOfFame, {key: 'hof', hallOfFame: tournState.hallOfFame}),
+  ]);
+}
+
+function App() {
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('autopoietic_api_key') || '');
+  const [endpoint, setEndpoint] = useState(() => localStorage.getItem('autopoietic_endpoint') || 'https://api.anthropic.com/v1/messages');
+  const [model, setModel] = useState(() => localStorage.getItem('autopoietic_model') || 'claude-sonnet-4-6');
+  const [mode, setMode] = useState('single');
+  const [tournState, setTournState] = useState(createTournamentState);
+  const tournRef = useRef(false);
+  const [state, setState] = useState(createAgentState);
+  const [evalCollapsed, setEvalCollapsed] = useState(false);
+  const [viewingProblemIdx, setViewingProblemIdx] = useState(null); // null = show live scratchpad
+  const runningRef = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const saveApiKey = useCallback((v) => { setApiKey(v); localStorage.setItem('autopoietic_api_key', v); }, []);
+  const saveEndpoint = useCallback((v) => { setEndpoint(v); localStorage.setItem('autopoietic_endpoint', v); }, []);
+  const saveModel = useCallback((v) => { setModel(v); localStorage.setItem('autopoietic_model', v); }, []);
+
+  const handleStart = useCallback(() => {
+    if (!apiKey) { alert('Enter API key'); return; }
+    runningRef.current = true;
+    setViewingProblemIdx(null);
+    const s = stateRef.current.problemIndex > 0 && stateRef.current.running === false
+      ? stateRef.current
+      : createAgentState();
+    setState(s);
+    runAllProblems(s, apiKey, endpoint, model, (ns) => setState({...ns}), () => runningRef.current);
+  }, [apiKey, endpoint, model]);
+
+  const handlePause = useCallback(() => {
+    runningRef.current = false;
+  }, []);
+
+  const handleReset = useCallback(() => {
+    runningRef.current = false;
+    setViewingProblemIdx(null);
+    setState(createAgentState());
+  }, []);
+
+  const handleContinue = useCallback(() => {
+    if (!apiKey) { alert('Enter API key'); return; }
+    runningRef.current = true;
+    setViewingProblemIdx(null);
+    const s = stateRef.current;
+    (async () => {
+      // Run reflection for the completed round if it wasn't done
+      if (!s.reflectionDone) {
+        s.running = true;
+        s.status = 'Reflection phase...';
+        setState({...s});
+        await runReflection(s, apiKey, endpoint, model, (ns) => setState({...ns}), () => runningRef.current);
+      }
+      // Advance to next round
+      s.problemIndex = 0;
+      s.round++;
+      s.stepBudget = computeStepBudget(s.round);
+      s.failureNote = null;
+      s.reflectionDone = false;
+      s.nativeDefsThisRound = 0;
+      // Build problem list for this round
+      s.currentProblems = buildProblemList(s.round);
+      // Keep myEvalSource, evalHistory, stats, problemHistory, persistentDefs
+      setState({...s});
+      runAllProblems(s, apiKey, endpoint, model, (ns) => setState({...ns}), () => runningRef.current);
+    })();
+  }, [apiKey, endpoint, model]);
+
+  const handleStep = useCallback(() => {
+    if (!apiKey) { alert('Enter API key'); return; }
+    runningRef.current = true;
+    setViewingProblemIdx(null);
+    const s = stateRef.current.running === false && stateRef.current.env
+      ? stateRef.current
+      : (() => { const ns = stateRef.current.env ? stateRef.current : createAgentState(); initEnv(ns); return ns; })();
+    setState({...s, running: true});
+    // Run just one problem then stop
+    (async () => {
+      s.running = true;
+      if (!s.env) initEnv(s);
+      await runProblem(s, apiKey, endpoint, model, (ns) => setState({...ns}), () => runningRef.current);
+      s.problemIndex++;
+      const probs = s.currentProblems || PROBLEMS;
+      // Run reflection if all problems complete
+      if (s.problemIndex >= probs.length && !s.reflectionDone) {
+        s.status = 'Reflection phase...';
+        setState({...s});
+        await runReflection(s, apiKey, endpoint, model, (ns) => setState({...ns}), () => runningRef.current);
+      }
+      s.running = false;
+      runningRef.current = false;
+      const roundLabel = s.round > 1 ? ` (Round ${s.round})` : '';
+      s.status = s.problemIndex >= probs.length ? `All problems complete!${roundLabel}` : `Paused after problem ${s.problemIndex}`;
+      setState({...s});
+    })();
+  }, [apiKey, endpoint, model]);
+
+  const handleBadgeClick = useCallback((idx) => {
+    // If clicking the current active problem, show live scratchpad
+    if (idx === stateRef.current.problemIndex) {
+      setViewingProblemIdx(null);
+      return;
+    }
+    // Find the history entry for this problem index
+    const probs = stateRef.current.currentProblems || PROBLEMS;
+    const hist = stateRef.current.problemHistory.filter(h => h.problemId === probs[idx].id);
+    if (hist.length > 0) {
+      setViewingProblemIdx(idx);
+    }
+  }, []);
+
+  // Clear viewing when agent moves to a new problem
+  useEffect(() => {
+    if (state.running) setViewingProblemIdx(null);
+  }, [state.problemIndex, state.running]);
+
+  const handleExport = useCallback(() => {
+    const s = stateRef.current;
+    const exportData = {
+      version: 4,
+      timestamp: new Date().toISOString(),
+      mode,
+      round: s.round,
+      stepBudget: s.stepBudget,
+      problemIndex: s.problemIndex,
+      myEvalSource: s.myEvalSource,
+      evalHistory: s.evalHistory,
+      stats: s.stats,
+      problemHistory: s.problemHistory,
+      failureNote: s.failureNote,
+      reflectionDone: s.reflectionDone,
+      nativeDefsThisRound: s.nativeDefsThisRound || 0,
+      bonusStepsEarned: s.bonusStepsEarned || 0,
+      persistentDefs: Object.fromEntries(
+        Object.entries(s.persistentDefs || {}).map(([name, def]) => [name, {
+          isNative: def.isNative,
+          expr: def.expr || null,
+          sourceParams: def.sourceParams || null,
+          sourceBody: def.sourceBody ? def.sourceBody.map(b => lispToString(b)) : null,
+        }])
+      ),
+      // Tournament state (if in tournament mode)
+      tournamentState: mode === 'tournament' ? {
+        generation: tournState.generation,
+        lineagesPerGen: tournState.lineagesPerGen,
+        roundsPerLineage: tournState.roundsPerLineage,
+        hallOfFame: tournState.hallOfFame,
+        genHistory: tournState.genHistory,
+        status: tournState.status,
+      } : null,
+    };
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const prefix = mode === 'tournament' ? `tourn-g${tournState.generation}` : `r${s.round}`;
+    a.href = url;
+    a.download = `autopoietic-${prefix}-${new Date().toISOString().slice(0,16).replace(/:/g,'-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [mode, tournState]);
+
+  const handleImport = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (!data.version || !data.myEvalSource) throw new Error('Invalid save file');
+          runningRef.current = false;
+          tournRef.current = false;
+
+          // Restore single-lineage state
+          const s = createAgentState();
+          s.round = data.round || 1;
+          s.stepBudget = data.stepBudget || computeStepBudget(s.round);
+          s.problemIndex = data.problemIndex || 0;
+          s.myEvalSource = data.myEvalSource;
+          s.evalHistory = data.evalHistory || s.evalHistory;
+          s.stats = {...s.stats, ...data.stats};
+          s.problemHistory = data.problemHistory || [];
+          s.failureNote = data.failureNote || null;
+          s.reflectionDone = data.reflectionDone || false;
+          s.nativeDefsThisRound = data.nativeDefsThisRound || 0;
+          s.bonusStepsEarned = data.bonusStepsEarned || 0;
+          s.persistentDefs = {};
+          if (data.persistentDefs) {
+            for (const [name, def] of Object.entries(data.persistentDefs)) {
+              if (def.isNative && def.sourceParams && def.sourceBody) {
+                const bodyExprs = def.sourceBody.map(b => parseOne(b));
+                s.persistentDefs[name] = {isNative: true, sourceParams: def.sourceParams, sourceBody: bodyExprs, expr: null};
+              } else if (def.expr) {
+                s.persistentDefs[name] = {isNative: false, expr: def.expr};
+              }
+            }
+          }
+          s.currentProblems = buildProblemList(s.round);
+          initEnv(s);
+          if (s.myEvalSource !== MY_EVAL_SEED) {
+            const exprs = parseAll(s.myEvalSource);
+            const ctx = {steps: 0, stepLimit: 5000, baseEnv: s.baseEnv, myEvalSource: s.myEvalSource};
+            for (const expr of exprs) evaluate(expr, s.env, ctx);
+          }
+          replayPersistentDefs(s);
+          s.status = `Imported: Round ${s.round}, problem ${s.problemIndex}/${s.currentProblems.length}`;
+          setState({...s});
+          setViewingProblemIdx(null);
+
+          // Restore tournament state if present
+          if (data.tournamentState) {
+            const ts = createTournamentState();
+            ts.generation = data.tournamentState.generation || 1;
+            ts.lineagesPerGen = data.tournamentState.lineagesPerGen || 4;
+            ts.roundsPerLineage = data.tournamentState.roundsPerLineage || 3;
+            ts.hallOfFame = data.tournamentState.hallOfFame || [];
+            ts.genHistory = data.tournamentState.genHistory || [];
+            ts.status = data.tournamentState.status || `Imported: Gen ${ts.generation}`;
+            setTournState(ts);
+            if (data.mode === 'tournament') setMode('tournament');
+          }
+          if (data.mode && !data.tournamentState) setMode(data.mode);
+        } catch (err) {
+          alert('Import failed: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }, []);
+
+  const curProblems = state.currentProblems || PROBLEMS;
+  const problem = curProblems[Math.min(state.problemIndex, curProblems.length - 1)];
+  const allComplete = state.problemIndex >= curProblems.length && !state.running;
+
+  // Determine what to show in scratchpad
+  let displayCells = state.scratchpad;
+  let viewingHistory = null;
+  if (viewingProblemIdx !== null) {
+    const histEntries = state.problemHistory.filter(h => h.problemId === curProblems[viewingProblemIdx].id);
+    if (histEntries.length > 0) {
+      const hist = histEntries[histEntries.length - 1];
+      displayCells = hist.scratchpad;
+      viewingHistory = hist;
+    }
+  }
+
+  const isRunning = mode === 'single' ? state.running : tournState.running;
+
+  return h('div', null, [
+    // Header
+    h('div', {className: 'header', key: 'hdr'}, [
+      h('h1', {key: 't'}, 'Autopoietic Mind'),
+      h('div', {className: 'header-right', key: 'r'}, [
+        h('input', {key: 'api', className: 'api-input', type: 'password', placeholder: 'Anthropic API Key',
+          value: apiKey, onChange: (e) => saveApiKey(e.target.value)}),
+        h('input', {key: 'ep', className: 'api-input endpoint-input', type: 'text', placeholder: 'API Endpoint',
+          value: endpoint, onChange: (e) => saveEndpoint(e.target.value)}),
+        h('input', {key: 'model', className: 'api-input', type: 'text', placeholder: 'Model', style: {width: '220px'},
+          value: model, onChange: (e) => saveModel(e.target.value)}),
+      ]),
+    ]),
+
+    // Mode toggle
+    h(ModeToggle, {key: 'mode', mode, onSetMode: setMode, disabled: isRunning}),
+
+    // Tournament mode
+    mode === 'tournament' ? h(TournamentView, {key: 'tourn', tournState, onUpdate: setTournState,
+      apiKey, endpoint, model, tournRef}) : null,
+
+    // Single lineage mode
+    mode === 'single' ? h('div', {key: 'single'}, [
+    // Controls
+    h('div', {className: 'controls', key: 'ctrl'}, [
+      h('button', {className: 'btn', key: 'start', onClick: handleStart, disabled: runningRef.current && state.running}, 'Start'),
+      h('button', {className: 'btn btn-secondary', key: 'step', onClick: handleStep, disabled: state.running || state.problemIndex >= curProblems.length}, 'Step'),
+      h('button', {className: 'btn btn-secondary', key: 'pause', onClick: handlePause, disabled: !state.running}, 'Pause'),
+      h('button', {className: 'btn btn-secondary', key: 'reset', onClick: handleReset}, 'Reset'),
+      allComplete ? h('button', {className: 'btn btn-continue', key: 'continue', onClick: handleContinue},
+        `Continue (Round ${state.round + 1})`) : null,
+      state.round > 1 ? h('span', {className: 'budget-cap', key: 'budgetcap'}, `Budget: ${state.stepBudget} steps`) : null,
+      h('span', {className: 'status-msg', key: 'status'}, state.status),
+    ]),
+
+    // Stats bar (moved to top)
+    h(StatsBar, {key: 'stats', stats: state.stats, evalSource: state.myEvalSource, round: state.round,
+      onExport: handleExport, onImport: handleImport, bonusStepsEarned: state.bonusStepsEarned, nativeDefsThisRound: state.nativeDefsThisRound}),
+
+    // Problem badges
+    h(ProblemBadges, {
+      key: 'badges',
+      problemHistory: state.problemHistory,
+      currentIndex: Math.min(state.problemIndex, curProblems.length - 1),
+      viewingIndex: viewingProblemIdx,
+      onSelect: handleBadgeClick,
+      round: state.round,
+      problems: curProblems,
+    }),
+
+    // Problem bar
+    h('div', {className: 'problem-bar', key: 'prob'}, [
+      h('div', {className: 'label', key: 'l'}, `Problem ${Math.min(state.problemIndex, curProblems.length - 1) + 1} of ${curProblems.length}${state.round > 1 ? ' (Round ' + state.round + ')' : ''}`),
+      h('div', {className: 'text', key: 't'}, problem.desc),
+    ]),
+
+    // Budget bars
+    h('div', {className: 'budget-row', key: 'bgt'}, [
+      h(BudgetBar, {key: 'c', label: 'Cells', used: state.cellsUsed, total: CELL_BUDGET, className: 'cells'}),
+      h(BudgetBar, {key: 's', label: 'Steps', used: state.stepsUsed, total: state.stepBudget || BASE_STEP_BUDGET, className: 'steps'}),
+    ]),
+
+    // Main grid
+    h('div', {className: 'main-grid', key: 'grid'}, [
+      // Left: scratchpad
+      h(ScratchpadPanel, {key: 'sp', cells: displayCells, viewingHistory}),
+      // Right: eval panels
+      h('div', {key: 'right'}, [
+        h(EvalSourcePanel, {key: 'es', source: state.myEvalSource, collapsed: evalCollapsed,
+          onToggle: () => setEvalCollapsed(c => !c)}),
+        h('div', {style: {height: '12px'}, key: 'gap'}),
+        h(EvalHistoryPanel, {key: 'eh', history: state.evalHistory}),
+        h(EvolutionPanel, {key: 'ev', stats: state.stats, persistentDefs: state.persistentDefs, evalHistory: state.evalHistory}),
+      ]),
+    ]),
+    ]) : null, // end single mode
+  ]);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>
