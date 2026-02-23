@@ -1,218 +1,192 @@
 # Autopoietic Mind
 
-A self-modifying Lisp system where an LLM agent evolves its own language by solving problems through a metacircular evaluator it can rewrite at runtime.
+An LLM agent that evolves its own programming language. It starts with a 49-line Lisp evaluator it can read and rewrite at runtime — adding new syntax, new control flow, whatever it needs to solve increasingly hard problems. Multiple lineages compete in a tournament; the best-evolved language seeds the next generation.
 
-Single file (`index.html`), no build step — runs directly in browser with an Anthropic API key.
+Single file, no build step. Open `index.html` in a browser, paste an Anthropic API key, and watch it go.
+
+## What happens
+
+The agent gets a problem like "define `(merge-sort lst)`" and a step budget. It thinks in s-expressions on a scratchpad — planning, trying, testing — then submits an answer. If it struggles, it can crack open its own evaluator and bolt on a new language construct: pattern matching, pipelines, memoization, whatever it invents. That construct persists for all future problems.
+
+Across rounds the budget shrinks, forcing the agent to rely on the language features it built. Across generations, tournament selection keeps the lineage whose evolved language solves the most problems.
+
+Constructs agents have invented: `match`, `->`, `fold`, `pipe`, `memo-lambda`, `collect`, `do`, `for-each`
+
+## Quick start
+
+1. Open `index.html` in any modern browser
+2. Enter your Anthropic API key
+3. Pick **Single Lineage** to watch one agent work, or **Tournament** to run competitive evolution
+4. Hit Start
+
+State can be exported/imported as JSON at any time.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         TOURNAMENT SELECTION                                │
-│                                                                             │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐                       │
-│  │Lineage 1│  │Lineage 2│  │Lineage 3│  │Lineage 4│   M lineages/gen      │
-│  │ R1→R2→R3│  │ R1→R2→R3│  │ R1→R2→R3│  │ R1→R2→R3│   N rounds each      │
-│  │fitness:.6│  │fitness:.7│  │fitness:.5│  │fitness:.4│                      │
-│  └────┬─────┘  └────┬─────┘  └─────────┘  └─────────┘                      │
-│       │         ┌────┘                                                      │
-│       │         ▼ WINNER (wholesale)                                        │
-│       │    ┌─────────┐                                                      │
-│       │    │ Hall of  │──── eval source ────► Seeds ALL lineages            │
-│       │    │  Fame    │                       in next generation            │
-│       │    └─────────┘                                                      │
-│       │         │                                                           │
-│       ▼         ▼                                                           │
-│   Gen 1 ──► Gen 2 ──► Gen 3 ──► ...                                       │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+### The loop
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          ONE LINEAGE (Agent Run)                            │
-│                                                                             │
-│  Round 1 (15 problems)          Round 2 (15 problems)         Round 3      │
-│  Budget: 1500 steps             Budget: 1200 steps            Budget: 1000 │
-│  Native cap: ∞                  Native cap: 10                Native cap: 5│
-│  ┌─────┐┌─────┐   ┌──────┐    ┌─────┐┌─────┐   ┌──────┐                  │
-│  │Prob1││Prob2│...│Prob15│    │Prob1││Prob2│...│Prob15│    ...             │
-│  └──┬──┘└──┬──┘   └──┬───┘    └──┬──┘└──┬──┘   └──┬───┘                  │
-│     │      │         │           │      │         │                        │
-│     ▼      ▼         ▼           ▼      ▼         ▼                        │
-│  ┌──────────────────────┐     ┌──────────────────────┐                     │
-│  │  REFLECTION PHASE    │     │  REFLECTION PHASE    │                     │
-│  │  "Evolve my-eval for │     │  "Evolve my-eval for │                     │
-│  │   next round"        │     │   next round"        │                     │
-│  └──────────┬───────────┘     └──────────────────────┘                     │
-│             │                                                               │
-│    helpers + my-eval carry forward ──────────────►                          │
-└─────────────────────────────────────────────────────────────────────────────┘
+                    ┌──────────────┐
+                    │   Problem    │  "Define (merge-sort lst)"
+                    └──────┬───────┘
+                           │
+                           ▼
+  ┌─────────────────────────────────────────────┐
+  │               buildPrompt()                 │
+  │                                             │
+  │  problem + budget + my-eval source          │
+  │  + scratchpad history + helpers             │
+  └──────────────────┬──────────────────────────┘
+                     │
+                     ▼
+  ┌─────────────────────────────────────────────┐
+  │               LLM (Claude)                  │
+  │                                             │
+  │  Returns 1-5 s-expressions:                 │
+  │  (goal "sort the list")                     │
+  │  (define (merge-sort lst) ...)              │
+  │  (try (merge-sort '(5 3 1)))                │
+  │  (check '(1 3 5) (merge-sort '(5 3 1)))    │
+  │  (done (merge-sort '(5 3 8 1 9 2)))        │
+  └──────────────────┬──────────────────────────┘
+                     │
+                     ▼
+  ┌─────────────────────────────────────────────┐
+  │          Metacognitive Scratchpad           │
+  │                                             │
+  │  1 GOAL  "sort the list"              +2    │
+  │  2 CODE  (define (merge-sort ...) )   +45   │
+  │  3 TRY   (merge-sort '(5 3 1))       +30   │
+  │  4 CHECK (1 3 5) = (1 3 5)           +31   │
+  │  5 DONE  (merge-sort '(5 3 8 1 9 2)) +30   │
+  │     => (1 2 3 5 8 9) SOLVED                 │
+  │                                             │
+  │  25 cells max per problem                   │
+  └─────────────────────────────────────────────┘
+                     │
+              solved? ──► next problem
+              stuck?  ──► loop (LLM sees failure notes)
 ```
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     PROBLEM-SOLVING LOOP (per problem)                      │
-│                                                                             │
-│  ┌────────────────────┐     ┌──────────────────────────────────────┐       │
-│  │   buildPrompt()    │     │  LLM (Claude)                       │       │
-│  │                    │     │                                      │       │
-│  │ • Problem desc     │────►│  Sees: budget, my-eval source,      │       │
-│  │ • Budget remaining │     │  scratchpad history, helpers,        │       │
-│  │ • my-eval source   │◄────│  failure notes                      │       │
-│  │ • Scratchpad cells │     │                                      │       │
-│  │ • Persistent defs  │     │  Returns: up to 5 s-expressions     │       │
-│  │ • Failure notes    │     │  using metacognitive forms           │       │
-│  └────────────────────┘     └──────────────────────────────────────┘       │
-│           │                                                                 │
-│           ▼                                                                 │
-│  ┌─────────────────────────────────────────────┐                           │
-│  │          METACOGNITIVE SCRATCHPAD            │                           │
-│  │                                              │                           │
-│  │  1 GOAL  "Define factorial"            +2    │                           │
-│  │  2 CODE  (define (factorial n) ...)    +45   │                           │
-│  │  3 TRY   (factorial 5)                +30    │  Each cell: type,        │
-│  │  4 CHECK '120 (factorial 5)           +31    │  expression, result,     │
-│  │  5 DONE  (factorial 5)                +30    │  step cost               │
-│  │     => 120 ✓ SOLVED                          │                           │
-│  │                                              │                           │
-│  │  Max 25 cells/problem                        │                           │
-│  └──────────────────────────────────────────────┘                           │
-│                                                                             │
-│  Loop: buildPrompt → LLM → extract exprs → eval each → update scratchpad  │
-│  Until: (done ...) succeeds, budget exhausted, or error                    │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+### Dual evaluator
+
+The key architectural idea: two evaluators, one the agent controls.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        DUAL EVALUATOR ARCHITECTURE                          │
-│                                                                             │
-│  ┌─────────────────────────────┐  ┌──────────────────────────────────┐     │
-│  │    GROUND EVAL (JavaScript) │  │   MY-EVAL (Lisp, self-modifying) │     │
-│  │    Immutable, trusted       │  │   Starts as 49-line seed         │     │
-│  │                             │  │   Agent evolves via:             │     │
-│  │  Handles:                   │  │    • extend-eval! (add form)     │     │
-│  │   • All special forms       │  │    • edit-eval!   (replace all)  │     │
-│  │   • Metacognitive forms     │  │                                  │     │
-│  │   • Step counting           │  │  Handles:                        │     │
-│  │   • Error handling          │  │   • All standard Lisp forms      │     │
-│  │                             │  │   • Agent-invented forms         │     │
-│  │  entry point: evaluate()    │  │   • Problem code execution       │     │
-│  │                             │  │                                  │     │
-│  │  Routes to my-eval via:     │  │  entry point: (my-eval expr env) │     │
-│  │   evaluateViaMyEval()       │  │                                  │     │
-│  └──────────┬──────────────────┘  └──────────────┬───────────────────┘     │
-│             │                                     │                         │
-│             │  Metacognitive forms use             │                         │
-│             │  ground eval for control,            │                         │
-│             │  my-eval for content:                │                         │
-│             │                                     │                         │
-│             │  (goal "text")     → ground eval     │                         │
-│             │  (sub "label" body)→ ground + my-eval│                         │
-│             │  (try expr)        → ground + my-eval│                         │
-│             │  (check exp actual)→ ground + my-eval│                         │
-│             │  (done expr)       → ground + my-eval│                         │
-│             │  (extend-eval! ..) → ground eval     │                         │
-│             │  (defnative! ..)   → ground eval     │                         │
-│             │  plain code        → my-eval only    │                         │
-│             └─────────────────────────────────────┘                         │
-└─────────────────────────────────────────────────────────────────────────────┘
+  ┌──────────────────────────┐    ┌──────────────────────────┐
+  │  Ground Eval (JavaScript)│    │  my-eval (Lisp)          │
+  │  Immutable, trusted      │    │  Agent-modifiable        │
+  │                          │    │                          │
+  │  - Special forms         │    │  Starts as 49-line seed  │
+  │  - Metacognitive forms   │    │  Agent extends via:      │
+  │  - Step counting         │    │    extend-eval!          │
+  │  - Error boundaries      │    │    edit-eval!            │
+  │                          │    │                          │
+  │  evaluate()              │    │  (my-eval expr env)      │
+  └────────────┬─────────────┘    └────────────┬─────────────┘
+               │                                │
+               │    Control forms (goal, try,    │
+               │    check, done) run in ground.  │
+               │    User code runs in my-eval.   │
+               └────────────────────────────────┘
 ```
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         SELF-MODIFICATION FLOW                              │
-│                                                                             │
-│                     ┌──────────────────────┐                               │
-│                     │   extend-eval!       │                               │
-│                     │   (add one form)     │                               │
-│                     └──────────┬───────────┘                               │
-│                                │                                            │
-│                                ▼                                            │
-│  my-eval source:          Find insertion point                             │
-│  (define (my-eval ...)    (before final else clause)                       │
-│    (cond                        │                                          │
-│      ((number?) expr)           ▼                                          │
-│      ((symbol?) lookup)   Insert: ((eq? head 'new-form) body)             │
-│      ...                        │                                          │
-│      ((eq? head 'quote) ..)     ▼                                          │
-│      ((eq? head 'if) ..)  ┌──────────────┐                                │
-│      ((eq? head 'let) ..) │  Sanity tests │  42, (+ 1 2),                 │
-│   ┌► ((eq? head 'NEW) ..) │  (4 basic)    │  (if #t 1 2),                 │
-│   │  (else (my-apply ..)) └──────┬───────┘  ((lambda (x) x) 5)           │
-│   │                              │                                         │
-│   │                    pass ─────┤                                         │
-│   │                              ▼                                         │
-│   │                     ┌──────────────────┐                               │
-│   │                     │ Commit new source │                              │
-│   └─── NEW FORM ADDED ─│ Detect novel form │                              │
-│                         │ Grant +150 steps  │                              │
-│                         └──────────────────┘                               │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+### Self-modification
+
+When the agent calls `(extend-eval! 'match ...)`:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          PROBLEM POOL (103 problems)                        │
-│                                                                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                     │
-│  │  STANDARD    │  │    HARD      │  │  EVOLUTION   │                     │
-│  │  (IDs 1-15)  │  │ (IDs 101-120)│  │ (IDs 201-208)│                     │
-│  │  factorial,  │  │  tree-map,   │  │  deriv,      │                     │
-│  │  reverse,    │  │  topo-sort,  │  │  simplify,   │                     │
-│  │  flatten,    │  │  CPS, church,│  │  free-vars,  │                     │
-│  │  group-by    │  │  matrix-mul  │  │  rewrite     │                     │
-│  └──────────────┘  └──────────────┘  └──────────────┘                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                     │
-│  │   STRING     │  │ HIGHER-ORDER │  │ NUMBER THEORY│                     │
-│  │ (IDs 300-309)│  │ (IDs 400-409)│  │ (IDs 500-509)│                     │
-│  │  palindrome, │  │  curry,      │  │  GCD, prime?,│                     │
-│  │  caesar,     │  │  pipe,       │  │  collatz,    │                     │
-│  │  chunk,      │  │  complement, │  │  modpow,     │                     │
-│  │  intersperse │  │  zip-with    │  │  totient     │                     │
-│  └──────────────┘  └──────────────┘  └──────────────┘                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                     │
-│  │  RECURSIVE   │  │    LOGIC     │  │     META     │                     │
-│  │ (IDs 600-609)│  │ (IDs 700-709)│  │ (IDs 800-809)│                     │
-│  │  bin-search, │  │  truth-table,│  │  accumulator,│                     │
-│  │  merge-sort, │  │  de-morgan,  │  │  Y combinator│                     │
-│  │  BST ops,    │  │  tautology?, │  │  church nums,│                     │
-│  │  n-queens    │  │  eval-bool   │  │  make-stack  │                     │
-│  └──────────────┘  └──────────────┘  └──────────────┘                     │
-│                                                                             │
-│  Tournament mode: 15 problems/round, ≥1 from each category                │
-│  Single mode:     15 problems/round, weighted by round difficulty          │
-└─────────────────────────────────────────────────────────────────────────────┘
+  my-eval source (cond chain):
+
+    ((number? expr) expr)
+    ((symbol? expr) lookup)
+    ((eq? head 'quote) ...)
+    ((eq? head 'if) ...)
+    ((eq? head 'let) ...)
+    ((eq? head 'match) ...)    ◄── inserted here
+    (else (my-apply ...))
+
+                 │
+                 ▼
+        ┌─────────────────┐
+        │  4 sanity tests  │  42, (+ 1 2), (if #t 1 2),
+        │  must all pass   │  ((lambda (x) x) 5)
+        └────────┬────────┘
+                 │ pass
+                 ▼
+        Commit new source
+        Detect novel construct
+        Grant +150 bonus steps
 ```
 
+### Tournament selection
+
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          EVOLUTIONARY PRESSURE                              │
-│                                                                             │
-│  Scarcity increases over rounds:                                           │
-│                                                                             │
-│     Round │ Step Budget │ Native Cap │ Problems From                       │
-│    ───────┼─────────────┼────────────┼──────────────                       │
-│       1   │    1500     │     ∞      │ Standard only                       │
-│       2   │    1200     │     10     │ Standard + Hard + New pools         │
-│       3   │    1000     │      5     │ Hard + Evolution + New pools        │
-│      4+   │     600     │      3     │ Mostly Evolution + New pools        │
-│                                                                             │
-│  This creates pressure to:                                                 │
-│   • Build reusable helpers early (persist across problems)                 │
-│   • Evolve my-eval for efficiency (fewer steps = higher fitness)           │
-│   • Invent novel constructs (extends language expressiveness)              │
-│   • Prefer extend-eval! over defnative! (native slots scarce)             │
-└─────────────────────────────────────────────────────────────────────────────┘
+  Gen 1                              Gen 2
+  ┌─────────┐ ┌─────────┐           ┌─────────┐ ┌─────────┐
+  │Lineage A│ │Lineage B│           │Lineage A│ │Lineage B│
+  │ .62     │ │ .71     │  winner   │ .68     │ │ .74     │  winner
+  └─────────┘ └────┬────┘  ──────►  └─────────┘ └────┬────┘  ──────► ...
+  ┌─────────┐      │ seed   all     ┌─────────┐      │ seed
+  │Lineage C│      ▼        get     │Lineage C│      ▼
+  │ .55     │ ┌─────────┐  same     │ .59     │ ┌─────────┐
+  └─────────┘ │Hall of  │  eval     └─────────┘ │Hall of  │
+  ┌─────────┐ │Fame     │  source   ┌─────────┐ │Fame     │
+  │Lineage D│ └─────────┘          │Lineage D│ └─────────┘
+  │ .48     │                       │ .63     │
+  └─────────┘                       └─────────┘
+
+  Each lineage gets a different personality bias:
+    recursion, higher-order, pattern-matching,
+    compactness, state/accumulation, lazy eval,
+    declarative, algebraic structure
 ```
 
-## How It Works
+Each lineage runs 3 rounds of 15 problems. Budgets tighten each round:
 
-1. The LLM agent receives a Lisp problem and its own evaluator source code
-2. It solves the problem using metacognitive forms (goal, try, check, done)
-3. Problem code runs through my-eval (the Lisp metacircular evaluator)
-4. When the agent struggles, it can modify my-eval to add new language features
-5. Successful modifications grant bonus steps and persist to future problems
-6. After each round, a reflection phase encourages strategic language evolution
-7. In tournament mode, multiple lineages compete — the best eval source seeds the next generation
-8. Over generations, the language evolves toward greater expressiveness and efficiency
+| Round | Steps | Native cap | Pressure |
+|-------|-------|------------|----------|
+| 1 | 1500 | unlimited | Learn the basics |
+| 2 | 1200 | 10 | Build helpers |
+| 3 | 1000 | 5 | Lean on evolved language |
+| 4+ | 600 | 3 | Pure language fitness |
+
+### Fitness
+
+```
+0.45  solve rate           How many problems solved
+0.15  novelty              Unique constructs invented
+0.10  diversity            Breadth across 9 problem categories
+0.10  eval richness        Size/complexity of evolved evaluator
+0.10  adversarial bonus    Solve rate on LLM-generated problems
+0.10  evolution bonus      Any modification to my-eval at all
+```
+
+### Problem pool
+
+103 hardcoded problems across 9 categories, plus LLM-generated adversarial problems each generation:
+
+| Category | IDs | Examples |
+|----------|-----|---------|
+| Standard | 1-15 | factorial, reverse, flatten, group-by |
+| Hard | 101-120 | tree-map, topo-sort, CPS, matrix-mul |
+| Evolution | 201-208 | symbolic deriv, free-vars, rewrite rules |
+| String | 300-309 | palindrome, caesar cipher, chunk |
+| Higher-order | 400-409 | curry, pipe, complement, zip-with |
+| Number theory | 500-509 | GCD, prime factors, modpow, totient |
+| Recursive | 600-609 | binary search, merge-sort, n-queens |
+| Logic | 700-709 | truth tables, De Morgan, tautology check |
+| Meta | 800-809 | Y combinator, Church numerals, make-stack |
+| **Adversarial** | 900+ | **LLM-generated each generation, targeting gaps** |
+
+## Tech
+
+- Single `index.html` (~2800 lines)
+- React 18 via CDN, no JSX (`createElement` throughout)
+- Anthropic Messages API (endpoint and model configurable)
+- JSON export/import for full state persistence
+- Dark theme, monospace everything
+
+## License
+
+MIT
